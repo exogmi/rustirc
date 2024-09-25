@@ -1,6 +1,6 @@
 
 use crate::commands::parser::Command;
-use crate::models::user::{User, UserStatus};
+use crate::models::user::User;
 use crate::models::channel::Channel;
 use crate::models::message::{Message, Recipient};
 use std::collections::HashMap;
@@ -29,13 +29,18 @@ pub async fn handle_command(command: Command, client_id: usize, shared_state: &S
         Command::Kick(_, _, _) => Err("KICK command not implemented yet".to_string()),
         Command::Who(_) => Err("WHO command not implemented yet".to_string()),
         Command::WhoisUser(_) => Err("WHOIS command not implemented yet".to_string()),
+        Command::WhoisServer(_) => Err("WHOIS command not implemented yet".to_string()),
+        Command::WhoisOperator(_) => Err("WHOIS command not implemented yet".to_string()),
+        Command::WhoisIdle(_) => Err("WHOIS command not implemented yet".to_string()),
+        Command::WhoisChannels(_) => Err("WHOIS command not implemented yet".to_string()),
+        Command::WhoisAuth(_) => Err("WHOIS command not implemented yet".to_string()),
         Command::Whowas(_, _, _) => Err("WHOWAS command not implemented yet".to_string()),
     }
 }
 
 fn handle_nick(client_id: usize, nickname: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
     let mut users = shared_state.users.lock().unwrap();
-    if let Some(user) = users.get_mut(&client_id) {
+    if let Some(_user) = users.get_mut(&client_id) {
         user.set_nickname(nickname.clone())?;
         Ok(vec![format!(":{} NICK :{}", user.nickname.as_ref().unwrap(), nickname)])
     } else {
@@ -101,7 +106,7 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
     if let Some(sender) = users.get(&client_id) {
         let sender_nick = sender.nickname.clone().unwrap_or_else(|| client_id.to_string());
         let recipient = if target.starts_with('#') {
-            if let Some(channel) = channels.get(&target) {
+            if let Some(_) = channels.get(&target) {
                 Recipient::Channel(target.clone())
             } else {
                 return Err(format!("Channel {} not found", target));
@@ -114,20 +119,20 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
             }
         };
 
-        let msg = Message::new(client_id, recipient.clone(), message.clone());
+        let _msg = Message::new(client_id, recipient.clone(), message.clone());
 
         match recipient {
             Recipient::Channel(channel_name) => {
                 if let Some(channel) = channels.get(&channel_name) {
                     Ok(channel.members.iter()
                         .filter(|&&id| id != client_id)
-                        .map(|&id| format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message))
+                        .map(|&_id| format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message))
                         .collect())
                 } else {
                     Err(format!("Channel {} not found", channel_name))
                 }
             }
-            Recipient::User(target_id) => {
+            Recipient::User(_target_id) => {
                 Ok(vec![format!(":{} PRIVMSG {} :{}", sender_nick, target, message)])
             }
         }

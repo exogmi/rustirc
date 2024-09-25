@@ -1,5 +1,5 @@
 
-use crate::commands::parser::{Command, parse_command};
+use crate::commands::parser::Command;
 use crate::commands::handler::{handle_command, SharedState};
 use crate::models::user::User;
 use crate::models::channel::Channel;
