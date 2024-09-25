@@ -40,7 +40,7 @@ pub async fn handle_command(command: Command, client_id: usize, shared_state: &S
 
 fn handle_nick(client_id: usize, nickname: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
     let mut users = shared_state.users.lock().unwrap();
-    if let Some(_user) = users.get_mut(&client_id) {
+    if let Some(user) = users.get_mut(&client_id) {
         user.set_nickname(nickname.clone())?;
         Ok(vec![format!(":{} NICK :{}", user.nickname.as_ref().unwrap(), nickname)])
     } else {
@@ -167,7 +167,7 @@ fn handle_ping(server: String) -> Result<Vec<String>, String> {
 
 fn handle_pong(client_id: usize, shared_state: &SharedState) -> Result<Vec<String>, String> {
     let mut users = shared_state.users.lock().unwrap();
-    if let Some(user) = users.get_mut(&client_id) {
+    if let Some(_user) = users.get_mut(&client_id) {
         // Update last activity timestamp
         // For now, we'll just return an OK message
         Ok(vec!["PONG received".to_string()])
