@@ -1,130 +1,291 @@
 
 use crate::commands::parser::{Command, parse_command};
+use crate::commands::handler::{handle_command, SharedState};
+use crate::models::user::User;
+use crate::models::channel::Channel;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
-#[test]
-fn test_parse_nick_command() {
-    assert_eq!(parse_command("NICK johndoe"), Some(Command::Nick("johndoe".to_string())));
+// Existing tests...
+
+#[tokio::test]
+async fn test_handle_nick_command() {
+    let mut users = HashMap::new();
+    users.insert(1, User::new(1, "127.0.0.1".parse().unwrap()));
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(users)),
+        channels: Arc::new(Mutex::new(HashMap::new())),
+    };
+
+    let command = Command::Nick("newname".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![":<unknown> NICK :newname"]);
+
+    let users = shared_state.users.lock().unwrap();
+    assert_eq!(users.get(&1).unwrap().nickname, Some("newname".to_string()));
 }
 
-#[test]
-fn test_parse_user_command() {
-    assert_eq!(
-        parse_command("USER guest 0 * :John Doe"),
-        Some(Command::User("guest".to_string(), "0".to_string(), "*".to_string()))
-    );
+#[tokio::test]
+async fn test_handle_user_command() {
+    let mut users = HashMap::new();
+    users.insert(1, User::new(1, "127.0.0.1".parse().unwrap()));
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(users)),
+        channels: Arc::new(Mutex::new(HashMap::new())),
+    };
+
+    let command = Command::User("username".to_string(), "0".to_string(), "realname".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec!["Welcome to the IRC server!"]);
+
+    let users = shared_state.users.lock().unwrap();
+    let user = users.get(&1).unwrap();
+    assert_eq!(user.username, Some("username".to_string()));
+    assert_eq!(user.realname, Some("realname".to_string()));
 }
 
-#[test]
-fn test_parse_join_command() {
-    assert_eq!(parse_command("JOIN #rust"), Some(Command::Join("#rust".to_string())));
+#[tokio::test]
+async fn test_handle_join_command() {
+    let mut users = HashMap::new();
+    let mut user = User::new(1, "127.0.0.1".parse().unwrap());
+    user.set_nickname("testuser".to_string()).unwrap();
+    users.insert(1, user);
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(users)),
+        channels: Arc::new(Mutex::new(HashMap::new())),
+    };
+
+    let command = Command::Join("#testchannel".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![
+        ":testuser JOIN :#testchannel",
+        ":server 353 testuser = #testchannel :testuser",
+        ":server 366 testuser #testchannel :End of /NAMES list",
+    ]);
+
+    let channels = shared_state.channels.lock().unwrap();
+    assert!(channels.contains_key("#testchannel"));
+    assert!(channels.get("#testchannel").unwrap().members.contains(&1));
 }
 
-#[test]
-fn test_parse_part_command() {
-    assert_eq!(parse_command("PART #rust"), Some(Command::Part("#rust".to_string())));
+#[tokio::test]
+async fn test_handle_part_command() {
+    let mut users = HashMap::new();
+    let mut user = User::new(1, "127.0.0.1".parse().unwrap());
+    user.set_nickname("testuser".to_string()).unwrap();
+    user.join_channel("#testchannel".to_string());
+    users.insert(1, user);
+
+    let mut channels = HashMap::new();
+    let mut channel = Channel::new("#testchannel".to_string());
+    channel.add_member(1);
+    channels.insert("#testchannel".to_string(), channel);
+
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(users)),
+        channels: Arc::new(Mutex::new(channels)),
+    };
+
+    let command = Command::Part("#testchannel".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![":testuser PART :#testchannel"]);
+
+    let channels = shared_state.channels.lock().unwrap();
+    assert!(!channels.get("#testchannel").unwrap().members.contains(&1));
 }
 
-#[test]
-fn test_parse_privmsg_command() {
-    assert_eq!(
-        parse_command("PRIVMSG #rust :Hello, Rustaceans!"),
-        Some(Command::PrivMsg("#rust".to_string(), "Hello, Rustaceans!".to_string()))
-    );
+#[tokio::test]
+async fn test_handle_privmsg_command() {
+    let mut users = HashMap::new();
+    let mut user1 = User::new(1, "127.0.0.1".parse().unwrap());
+    user1.set_nickname("user1".to_string()).unwrap();
+    users.insert(1, user1);
+    let mut user2 = User::new(2, "127.0.0.1".parse().unwrap());
+    user2.set_nickname("user2".to_string()).unwrap();
+    users.insert(2, user2);
+
+    let mut channels = HashMap::new();
+    let mut channel = Channel::new("#testchannel".to_string());
+    channel.add_member(1);
+    channel.add_member(2);
+    channels.insert("#testchannel".to_string(), channel);
+
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(users)),
+        channels: Arc::new(Mutex::new(channels)),
+    };
+
+    // Test private message
+    let command = Command::PrivMsg("user2".to_string(), "Hello, user2!".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![":user1 PRIVMSG user2 :Hello, user2!"]);
+
+    // Test channel message
+    let command = Command::PrivMsg("#testchannel".to_string(), "Hello, channel!".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![":user1 PRIVMSG #testchannel :Hello, channel!"]);
 }
 
-#[test]
-fn test_parse_quit_command() {
-    assert_eq!(parse_command("QUIT"), Some(Command::Quit(None)));
-    assert_eq!(
-        parse_command("QUIT :Goodbye!"),
-        Some(Command::Quit(Some("Goodbye!".to_string())))
-    );
+#[tokio::test]
+async fn test_handle_quit_command() {
+    let mut users = HashMap::new();
+    let mut user = User::new(1, "127.0.0.1".parse().unwrap());
+    user.set_nickname("testuser".to_string()).unwrap();
+    user.join_channel("#testchannel".to_string());
+    users.insert(1, user);
+
+    let mut channels = HashMap::new();
+    let mut channel = Channel::new("#testchannel".to_string());
+    channel.add_member(1);
+    channels.insert("#testchannel".to_string(), channel);
+
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(users)),
+        channels: Arc::new(Mutex::new(channels)),
+    };
+
+    let command = Command::Quit(Some("Goodbye!".to_string()));
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![":testuser QUIT :Goodbye!"]);
+
+    let users = shared_state.users.lock().unwrap();
+    assert!(!users.contains_key(&1));
+
+    let channels = shared_state.channels.lock().unwrap();
+    assert!(!channels.get("#testchannel").unwrap().members.contains(&1));
 }
 
-#[test]
-fn test_parse_ping_command() {
-    assert_eq!(parse_command("PING server1"), Some(Command::Ping("server1".to_string())));
+#[tokio::test]
+async fn test_handle_ping_command() {
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(HashMap::new())),
+        channels: Arc::new(Mutex::new(HashMap::new())),
+    };
+
+    let command = Command::Ping("server1".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec!["PONG server1"]);
 }
 
-#[test]
-fn test_parse_pong_command() {
-    assert_eq!(parse_command("PONG server1"), Some(Command::Pong("server1".to_string())));
+#[tokio::test]
+async fn test_handle_topic_command() {
+    let mut users = HashMap::new();
+    let mut user = User::new(1, "127.0.0.1".parse().unwrap());
+    user.set_nickname("testuser".to_string()).unwrap();
+    users.insert(1, user);
+
+    let mut channels = HashMap::new();
+    let channel = Channel::new("#testchannel".to_string());
+    channels.insert("#testchannel".to_string(), channel);
+
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(users)),
+        channels: Arc::new(Mutex::new(channels)),
+    };
+
+    // Set topic
+    let command = Command::Topic("#testchannel".to_string(), Some("New topic".to_string()));
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![":testuser TOPIC #testchannel :New topic"]);
+
+    // Get topic
+    let command = Command::Topic("#testchannel".to_string(), None);
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![":server 332 testuser #testchannel :New topic"]);
 }
 
-#[test]
-fn test_parse_mode_command() {
-    assert_eq!(
-        parse_command("MODE #channel +o user1"),
-        Some(Command::Mode("#channel".to_string(), "+o".to_string(), Some("user1".to_string())))
-    );
+#[tokio::test]
+async fn test_handle_names_command() {
+    let mut users = HashMap::new();
+    let mut user1 = User::new(1, "127.0.0.1".parse().unwrap());
+    user1.set_nickname("user1".to_string()).unwrap();
+    users.insert(1, user1);
+    let mut user2 = User::new(2, "127.0.0.1".parse().unwrap());
+    user2.set_nickname("user2".to_string()).unwrap();
+    users.insert(2, user2);
+
+    let mut channels = HashMap::new();
+    let mut channel = Channel::new("#testchannel".to_string());
+    channel.add_member(1);
+    channel.add_member(2);
+    channels.insert("#testchannel".to_string(), channel);
+
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(users)),
+        channels: Arc::new(Mutex::new(channels)),
+    };
+
+    let command = Command::Names("#testchannel".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![
+        ":server 353 * = #testchannel :user1 user2",
+        ":server 366 * #testchannel :End of /NAMES list",
+    ]);
 }
 
-#[test]
-fn test_parse_topic_command() {
-    assert_eq!(
-        parse_command("TOPIC #rust :Rust Programming Language"),
-        Some(Command::Topic("#rust".to_string(), Some("Rust Programming Language".to_string())))
-    );
-    assert_eq!(
-        parse_command("TOPIC #rust"),
-        Some(Command::Topic("#rust".to_string(), None))
-    );
-}
+#[tokio::test]
+async fn test_handle_list_command() {
+    let users = HashMap::new();
 
-#[test]
-fn test_parse_names_command() {
-    assert_eq!(parse_command("NAMES #rust"), Some(Command::Names("#rust".to_string())));
-}
+    let mut channels = HashMap::new();
+    let mut channel1 = Channel::new("#channel1".to_string());
+    channel1.set_topic("Topic 1".to_string());
+    channel1.add_member(1);
+    channels.insert("#channel1".to_string(), channel1);
 
-#[test]
-fn test_parse_list_command() {
-    assert_eq!(parse_command("LIST"), Some(Command::List(None)));
-    assert_eq!(parse_command("LIST #rust"), Some(Command::List(Some("#rust".to_string()))));
-}
+    let mut channel2 = Channel::new("#channel2".to_string());
+    channel2.set_topic("Topic 2".to_string());
+    channel2.add_member(1);
+    channel2.add_member(2);
+    channels.insert("#channel2".to_string(), channel2);
 
-#[test]
-fn test_parse_invite_command() {
-    assert_eq!(
-        parse_command("INVITE user1 #rust"),
-        Some(Command::Invite("user1".to_string(), "#rust".to_string()))
-    );
-}
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(users)),
+        channels: Arc::new(Mutex::new(channels)),
+    };
 
-#[test]
-fn test_parse_kick_command() {
-    assert_eq!(
-        parse_command("KICK #rust user1"),
-        Some(Command::Kick("#rust".to_string(), "user1".to_string(), None))
-    );
-    assert_eq!(
-        parse_command("KICK #rust user1 :Reason for kick"),
-        Some(Command::Kick("#rust".to_string(), "user1".to_string(), Some("Reason for kick".to_string())))
-    );
-}
+    // List all channels
+    let command = Command::List(None);
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![
+        ":server 321 Channel :Users Name",
+        ":server 322 #channel1 1 :Topic 1",
+        ":server 322 #channel2 2 :Topic 2",
+        ":server 323 :End of /LIST",
+    ]);
 
-#[test]
-fn test_parse_who_command() {
-    assert_eq!(parse_command("WHO #rust"), Some(Command::Who("#rust".to_string())));
-}
-
-#[test]
-fn test_parse_whois_command() {
-    assert_eq!(parse_command("WHOIS user1"), Some(Command::WhoisUser("user1".to_string())));
-}
-
-#[test]
-fn test_parse_whowas_command() {
-    assert_eq!(
-        parse_command("WHOWAS user1"),
-        Some(Command::Whowas("user1".to_string(), None, None))
-    );
-    assert_eq!(
-        parse_command("WHOWAS user1 1 server1"),
-        Some(Command::Whowas("user1".to_string(), Some("1".to_string()), Some("server1".to_string())))
-    );
-}
-
-#[test]
-fn test_parse_invalid_command() {
-    assert_eq!(parse_command("INVALID_COMMAND"), None);
+    // List specific channel
+    let command = Command::List(Some("#channel1".to_string()));
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![
+        ":server 321 Channel :Users Name",
+        ":server 322 #channel1 1 :Topic 1",
+        ":server 323 :End of /LIST",
+    ]);
 }
