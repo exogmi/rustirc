@@ -1,5 +1,4 @@
 
-use std::str::FromStr;
 
 #[derive(Debug, PartialEq)]
 pub enum Command {
@@ -50,7 +49,7 @@ pub fn parse_command(input: &str) -> Option<Command> {
             let message = msg_parts.next()?.to_string();
             Some(Command::PrivMsg(target, message))
         }
-        "QUIT" => Some(Command::Quit(if params.is_empty() { None } else { Some(params.to_string()) })),
+        "QUIT" => Some(Command::Quit(if params.is_empty() { None } else { Some(params.trim_start_matches(':').to_string()) })),
         "PING" => Some(Command::Ping(params.to_string())),
         "PONG" => Some(Command::Pong(params.to_string())),
         "MODE" => {
@@ -78,11 +77,10 @@ pub fn parse_command(input: &str) -> Option<Command> {
         }
         "KICK" => {
             let mut kick_parts = params.splitn(3, ' ');
-            Some(Command::Kick(
-                kick_parts.next()?.to_string(),
-                kick_parts.next()?.to_string(),
-                kick_parts.next().map(|s| s.to_string()),
-            ))
+            let channel = kick_parts.next()?.to_string();
+            let user = kick_parts.next()?.to_string();
+            let reason = kick_parts.next().map(|s| s.trim_start_matches(':').to_string());
+            Some(Command::Kick(channel, user, reason))
         }
         "WHO" => Some(Command::Who(params.to_string())),
         "WHOIS" => Some(Command::WhoisUser(params.to_string())),
