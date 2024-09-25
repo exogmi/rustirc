@@ -1,4 +1,6 @@
 mod utils;
+mod models;
+mod commands;
 
 #[cfg(test)]
 mod tests;
