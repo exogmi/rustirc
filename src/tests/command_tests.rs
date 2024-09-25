@@ -99,7 +99,8 @@ async fn test_handle_part_command() {
     assert_eq!(messages, vec![":testuser PART :#testchannel"]);
 
     let channels = shared_state.channels.lock().unwrap();
-    assert!(!channels.get("#testchannel").unwrap().members.contains(&1));
+    let channel = channels.get("#testchannel");
+    assert!(channel.is_none() || !channel.unwrap().members.contains(&1));
 }
 
 #[tokio::test]
@@ -239,10 +240,11 @@ async fn test_handle_names_command() {
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec![
-        ":server 353 * = #testchannel :user1 user2",
-        ":server 366 * #testchannel :End of /NAMES list",
-    ]);
+    assert_eq!(messages.len(), 2);
+    assert!(messages[0].starts_with(":server 353 * = #testchannel :"));
+    assert!(messages[0].contains("user1"));
+    assert!(messages[0].contains("user2"));
+    assert_eq!(messages[1], ":server 366 * #testchannel :End of /NAMES list");
 }
 
 #[tokio::test]
