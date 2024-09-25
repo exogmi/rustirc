@@ -41,8 +41,9 @@ pub async fn handle_command(command: Command, client_id: usize, shared_state: &S
 fn handle_nick(client_id: usize, nickname: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
     let mut users = shared_state.users.lock().unwrap();
     if let Some(user) = users.get_mut(&client_id) {
+        let old_nick = user.nickname.clone().unwrap_or_else(|| "<unknown>".to_string());
         user.set_nickname(nickname.clone())?;
-        Ok(vec![format!(":{} NICK :{}", user.nickname.as_ref().unwrap(), nickname)])
+        Ok(vec![format!(":{} NICK :{}", old_nick, nickname)])
     } else {
         Err("User not found".to_string())
     }
@@ -83,20 +84,20 @@ fn handle_part(client_id: usize, channel_name: String, shared_state: &SharedStat
     let mut channels = shared_state.channels.lock().unwrap();
     let mut users = shared_state.users.lock().unwrap();
 
+    let user = users.get_mut(&client_id).ok_or_else(|| "User not found".to_string())?;
+    let nick = user.nickname.clone().unwrap_or_else(|| client_id.to_string());
+
     if let Some(channel) = channels.get_mut(&channel_name) {
         channel.remove_member(&client_id);
         if channel.members.is_empty() {
             channels.remove(&channel_name);
         }
+    } else {
+        return Err(format!("Channel {} not found", channel_name));
     }
 
-    if let Some(user) = users.get_mut(&client_id) {
-        user.leave_channel(&channel_name);
-        let nick = user.nickname.clone().unwrap_or_else(|| client_id.to_string());
-        Ok(vec![format!(":{} PART :{}", nick, channel_name)])
-    } else {
-        Err("User not found".to_string())
-    }
+    user.leave_channel(&channel_name);
+    Ok(vec![format!(":{} PART :{}", nick, channel_name)])
 }
 
 fn handle_privmsg(client_id: usize, target: String, message: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
@@ -237,7 +238,9 @@ fn handle_list(channel: Option<String>, shared_state: &SharedState) -> Result<Ve
             }
         }
         None => {
-            for (name, channel) in channels.iter() {
+            let mut channel_list: Vec<_> = channels.iter().collect();
+            channel_list.sort_by(|a, b| a.0.cmp(b.0));
+            for (name, channel) in channel_list {
                 response.push(format!(":{} 322 {} {} :{}", "server", name, channel.members.len(), channel.topic.clone().unwrap_or_default()));
             }
         }
