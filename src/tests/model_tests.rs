@@ -42,9 +42,15 @@ fn test_user_nickname_validation() {
     let mut user = User::new(1, IpAddr::from_str("127.0.0.1").unwrap());
     
     assert!(user.set_nickname("valid_nick".to_string()).is_ok());
+    assert!(user.set_nickname("valid-nick".to_string()).is_ok());
+    assert!(user.set_nickname("valid_nick_123".to_string()).is_ok());
+    assert!(user.set_nickname("a".to_string()).is_ok());
+    assert!(user.set_nickname("abcdefghijklmnopqrst".to_string()).is_ok()); // 20 characters
+    
     assert!(user.set_nickname("".to_string()).is_err());
-    assert!(user.set_nickname("too_long_nickname".to_string()).is_err());
+    assert!(user.set_nickname("abcdefghijklmnopqrstu".to_string()).is_err()); // 21 characters
     assert!(user.set_nickname("invalid!".to_string()).is_err());
+    assert!(user.set_nickname("invalid space".to_string()).is_err());
 }
 
 #[test]

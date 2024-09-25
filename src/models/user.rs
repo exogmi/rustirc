@@ -33,8 +33,8 @@ impl User {
     }
 
     pub fn set_nickname(&mut self, nickname: String) -> Result<(), &'static str> {
-        // Basic nickname validation (you might want to expand this)
-        if nickname.is_empty() || nickname.len() > 9 || !nickname.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
+        // Basic nickname validation
+        if nickname.is_empty() || nickname.len() > 20 || !nickname.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_') {
             return Err("Invalid nickname");
         }
         self.nickname = Some(nickname);
