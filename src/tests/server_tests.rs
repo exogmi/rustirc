@@ -65,10 +65,12 @@ async fn test_multiple_client_connections() {
 #[tokio::test]
 async fn test_two_clients_join_and_message() {
     use tokio::io::{AsyncWriteExt, AsyncReadExt};
+    use tokio::time::timeout;
+    use std::time::Duration;
 
     let server_address = "127.0.0.1:8082";
     let server_task = tokio::spawn(async move {
-        if let Err(e) = start_server(server_address, log::LevelFilter::Info).await {
+        if let Err(e) = start_server(server_address, log::LevelFilter::Debug).await {
             eprintln!("Server error: {}", e);
         }
     });
@@ -85,33 +87,54 @@ async fn test_two_clients_join_and_message() {
     let mut client1 = connect_and_register(server_address, "user1").await;
     let mut client2 = connect_and_register(server_address, "user2").await;
 
+    println!("Clients connected and registered");
+
     // Join channel
     for client in [&mut client1, &mut client2].iter_mut() {
         client.write_all(b"JOIN #test\r\n").await.unwrap();
     }
 
+    println!("Clients joined channel");
+
     // Send message from client1
     client1.write_all(b"PRIVMSG #test :Hello, channel!\r\n").await.unwrap();
 
-    // Read response on client2
-    let mut buffer = [0; 1024];
-    let n = client2.read(&mut buffer).await.unwrap();
-    let mut response = String::from_utf8_lossy(&buffer[..n]).to_string();
+    println!("Message sent from client1");
 
-    println!("Response received by client2: {}", response);
+    // Read response on client2 with a timeout
+    let timeout_duration = Duration::from_secs(5);
+    let read_result = timeout(timeout_duration, async {
+        let mut buffer = [0; 1024];
+        let mut response = String::new();
+        loop {
+            match client2.read(&mut buffer).await {
+                Ok(0) => break,
+                Ok(n) => {
+                    let chunk = String::from_utf8_lossy(&buffer[..n]);
+                    println!("Received chunk: {}", chunk);
+                    response.push_str(&chunk);
+                    if response.contains("PRIVMSG #test :Hello, channel!") {
+                        break;
+                    }
+                }
+                Err(e) => {
+                    println!("Error reading from client2: {}", e);
+                    break;
+                }
+            }
+        }
+        response
+    }).await;
 
-    // Check if the response contains the expected message
-    if !response.contains("PRIVMSG #test :Hello, channel!") {
-        // If not, wait a bit and try reading again
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        let mut buffer2 = [0; 1024];
-        let n = client2.read(&mut buffer2).await.unwrap();
-        let second_response = String::from_utf8_lossy(&buffer2[..n]);
-        println!("Second response received by client2: {}", second_response);
-        response.push_str(&second_response);
+    match read_result {
+        Ok(response) => {
+            println!("Final response received by client2: {}", response);
+            assert!(response.contains("PRIVMSG #test :Hello, channel!"), "Expected message not found in response: {}", response);
+        }
+        Err(_) => {
+            panic!("Test timed out after {} seconds", timeout_duration.as_secs());
+        }
     }
-
-    assert!(response.contains("PRIVMSG #test :Hello, channel!"), "Unexpected response: {}", response);
 
     server_task.abort();
 }
