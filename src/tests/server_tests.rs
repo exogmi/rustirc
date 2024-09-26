@@ -7,7 +7,7 @@ async fn test_server_starts_and_accepts_connections() {
     // Start the server in a separate task
     let server_address = "127.0.0.1:8080";
     let server_task = tokio::spawn(async move {
-        if let Err(e) = start_server(server_address).await {
+        if let Err(e) = start_server(server_address, log::LevelFilter::Info).await {
             eprintln!("Server error: {}", e);
         }
     });
@@ -38,7 +38,7 @@ async fn test_client_disconnection() {
 async fn test_multiple_client_connections() {
     let server_address = "127.0.0.1:8081";
     let server_task = tokio::spawn(async move {
-        if let Err(e) = start_server(server_address).await {
+        if let Err(e) = start_server(server_address, log::LevelFilter::Info).await {
             eprintln!("Server error: {}", e);
         }
     });
