@@ -23,7 +23,7 @@ impl Client {
         }
     }
 
-    pub async fn handle(&mut self, shared_state: Arc<ListenerSharedState>, log_level: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn handle(&mut self, shared_state: Arc<ListenerSharedState>) -> Result<(), Box<dyn std::error::Error>> {
         let (reader, mut writer) = self.stream.split();
         let mut reader = BufReader::new(reader).lines();
 

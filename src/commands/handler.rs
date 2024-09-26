@@ -133,7 +133,7 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
 
         match recipient {
             Recipient::Channel(channel_name) => {
-                if let Some(channel) = channels.get(&channel_name) {
+                if let Some(_channel) = channels.get(&channel_name) {
                     Ok(vec![format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message)])
                 } else {
                     Err(format!("Channel {} not found", channel_name))
@@ -255,7 +255,7 @@ fn handle_list(channel: Option<String>, shared_state: &SharedState) -> Result<Ve
     response.push(format!(":{} 323 :End of /LIST", "server"));
     Ok(response)
 }
-fn handle_cap(client_id: usize, subcommand: String, param: Option<String>, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_cap(_client_id: usize, subcommand: String, _param: Option<String>, _shared_state: &SharedState) -> Result<Vec<String>, String> {
     match subcommand.as_str() {
         "LS" => Ok(vec!["CAP * LS :".to_string()]),
         "REQ" => Ok(vec!["CAP * ACK :".to_string()]),

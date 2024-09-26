@@ -18,7 +18,7 @@ async fn test_client_handling() {
     // Spawn the server task
     tokio::spawn(async move {
         let (socket, _) = listener.accept().await.unwrap();
-        let mut client = Client::new(1, socket, addr.ip(), server_state.tx.clone());
+        let mut client = Client::new(1, socket, addr.ip());
         client.handle(server_state, log::LevelFilter::Info).await.unwrap();
     });
 
