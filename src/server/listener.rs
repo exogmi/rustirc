@@ -1,12 +1,12 @@
 
 use tokio::net::TcpListener;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use crate::models::user::User;
 use crate::models::channel::Channel;
 use crate::utils::generate_client_id;
 use std::net::SocketAddr;
+use crate::server::client::Client;
 
 pub struct SharedState {
     pub users: Arc<Mutex<HashMap<usize, User>>>,
@@ -40,32 +40,19 @@ pub async fn start_server(address: &str) -> Result<(), Box<dyn std::error::Error
     }
 }
 
-pub async fn handle_client(mut socket: tokio::net::TcpStream, state: Arc<SharedState>, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState>, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
     let client_id = generate_client_id();
+    let mut client = Client::new(client_id, socket, addr.ip());
     
     // Initialize client state
     {
         let mut users = state.users.lock().unwrap();
-        users.insert(client_id, User::new(client_id, addr.ip()));
+        users.insert(client_id, client.user.clone());
     }
 
     println!("New client connected: {}", addr);
 
-    let mut buffer = [0; 1024];
-
-    loop {
-        let n = socket.read(&mut buffer).await?;
-        if n == 0 {
-            break; // Client disconnected
-        }
-
-        let message = String::from_utf8_lossy(&buffer[..n]);
-        println!("Received from client {}: {}", addr, message);
-
-        // Echo the message back to the client (temporary, replace with actual command handling later)
-        let response = format!("Echo: {}", message);
-        socket.write_all(response.as_bytes()).await?;
-    }
+    client.handle(state.clone()).await?;
 
     // Clean up client state
     {
