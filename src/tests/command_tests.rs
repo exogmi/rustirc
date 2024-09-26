@@ -21,7 +21,7 @@ async fn test_handle_nick_command() {
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec![":<unknown> NICK :newname"]);
+    assert_eq!(messages, vec![(1, ":<unknown> NICK :newname".to_string())]);
 
     let users = shared_state.users.lock().unwrap();
     assert_eq!(users.get(&1).unwrap().nickname, Some("newname".to_string()));
@@ -43,12 +43,12 @@ async fn test_handle_user_command() {
     assert!(result.is_ok());
     let messages = result.unwrap();
     assert_eq!(messages.len(), 6);
-    assert!(messages[0].contains("001 User1 :Welcome to the IRC server!"));
-    assert!(messages[1].contains("002 User1 :Your host is rustirc2"));
-    assert!(messages[2].contains("003 User1 :This server was created"));
-    assert!(messages[3].contains("004 User1 rustirc2 1.0 o o"));
-    assert!(messages[4].contains("005 User1 CHANTYPES=# CHARSET=utf-8"));
-    assert!(messages[5].contains("251 User1 :There are 1 users and 0 services on 1 server"));
+    assert!(messages[0].1.contains("001 User1 :Welcome to the IRC server!"));
+    assert!(messages[1].1.contains("002 User1 :Your host is rustirc2"));
+    assert!(messages[2].1.contains("003 User1 :This server was created"));
+    assert!(messages[3].1.contains("004 User1 rustirc2 1.0 o o"));
+    assert!(messages[4].1.contains("005 User1 CHANTYPES=# CHARSET=utf-8"));
+    assert!(messages[5].1.contains("251 User1 :There are 1 users and 0 services on 1 server"));
 
     let users = shared_state.users.lock().unwrap();
     let user = users.get(&1).unwrap();
@@ -72,9 +72,9 @@ async fn test_handle_join_command() {
     assert!(result.is_ok());
     let messages = result.unwrap();
     assert_eq!(messages, vec![
-        ":testuser JOIN :#testchannel",
-        ":server 353 testuser = #testchannel :testuser",
-        ":server 366 testuser #testchannel :End of /NAMES list",
+        (1, ":testuser JOIN :#testchannel".to_string()),
+        (1, ":server 353 testuser = #testchannel :testuser".to_string()),
+        (1, ":server 366 testuser #testchannel :End of /NAMES list".to_string()),
     ]);
 
     let channels = shared_state.channels.lock().unwrap();
@@ -104,7 +104,7 @@ async fn test_handle_part_command() {
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec![":testuser PART :#testchannel"]);
+    assert_eq!(messages, vec![(1, ":testuser PART :#testchannel".to_string())]);
 
     let channels = shared_state.channels.lock().unwrap();
     let channel = channels.get("#testchannel");
@@ -137,21 +137,21 @@ async fn test_handle_privmsg_command() {
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec![":user1 PRIVMSG user2 :Hello, user2!"]);
+    assert_eq!(messages, vec![(2, ":user1 PRIVMSG user2 :Hello, user2!".to_string())]);
 
     // Test channel message
     let command = Command::PrivMsg("#testchannel".to_string(), "Hello, channel!".to_string());
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec![":user1 PRIVMSG #testchannel :Hello, channel!"]);
+    assert_eq!(messages, vec![(2, ":user1 PRIVMSG #testchannel :Hello, channel!".to_string())]);
 
     // Test self-message (should be empty)
     let command = Command::PrivMsg("user1".to_string(), "Hello, myself!".to_string());
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, Vec::<String>::new());
+    assert_eq!(messages, Vec::<(usize, String)>::new());
 }
 
 #[tokio::test]
@@ -227,7 +227,7 @@ async fn test_handle_quit_command() {
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec![":testuser QUIT :Goodbye!"]);
+    assert_eq!(messages, vec![(1, ":testuser QUIT :Goodbye!".to_string())]);
 
     let users = shared_state.users.lock().unwrap();
     assert!(!users.contains_key(&1));
@@ -247,7 +247,7 @@ async fn test_handle_ping_command() {
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec!["PONG server1"]);
+    assert_eq!(messages, vec![(1, "PONG server1".to_string())]);
 }
 
 #[tokio::test]
@@ -271,14 +271,14 @@ async fn test_handle_topic_command() {
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec![":testuser TOPIC #testchannel :New topic"]);
+    assert_eq!(messages, vec![(1, ":testuser TOPIC #testchannel :New topic".to_string())]);
 
     // Get topic
     let command = Command::Topic("#testchannel".to_string(), None);
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec![":server 332 testuser #testchannel :New topic"]);
+    assert_eq!(messages, vec![(1, ":server 332 testuser #testchannel :New topic".to_string())]);
 }
 
 #[tokio::test]
@@ -307,10 +307,10 @@ async fn test_handle_names_command() {
     assert!(result.is_ok());
     let messages = result.unwrap();
     assert_eq!(messages.len(), 2);
-    assert!(messages[0].starts_with(":server 353 * = #testchannel :"));
-    assert!(messages[0].contains("user1"));
-    assert!(messages[0].contains("user2"));
-    assert_eq!(messages[1], ":server 366 * #testchannel :End of /NAMES list");
+    assert!(messages[0].1.starts_with(":server 353 * = #testchannel :"));
+    assert!(messages[0].1.contains("user1"));
+    assert!(messages[0].1.contains("user2"));
+    assert_eq!(messages[1], (1, ":server 366 * #testchannel :End of /NAMES list".to_string()));
 }
 
 #[tokio::test]
@@ -340,10 +340,10 @@ async fn test_handle_list_command() {
     assert!(result.is_ok());
     let messages = result.unwrap();
     assert_eq!(messages, vec![
-        ":server 321 Channel :Users Name",
-        ":server 322 #channel1 1 :Topic 1",
-        ":server 322 #channel2 2 :Topic 2",
-        ":server 323 :End of /LIST",
+        (1, ":server 321 Channel :Users Name".to_string()),
+        (1, ":server 322 #channel1 1 :Topic 1".to_string()),
+        (1, ":server 322 #channel2 2 :Topic 2".to_string()),
+        (1, ":server 323 :End of /LIST".to_string()),
     ]);
 
     // List specific channel
@@ -352,8 +352,8 @@ async fn test_handle_list_command() {
     assert!(result.is_ok());
     let messages = result.unwrap();
     assert_eq!(messages, vec![
-        ":server 321 Channel :Users Name",
-        ":server 322 #channel1 1 :Topic 1",
-        ":server 323 :End of /LIST",
+        (1, ":server 321 Channel :Users Name".to_string()),
+        (1, ":server 322 #channel1 1 :Topic 1".to_string()),
+        (1, ":server 323 :End of /LIST".to_string()),
     ]);
 }
