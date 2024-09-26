@@ -10,7 +10,7 @@ pub struct SharedState {
     pub channels: Arc<Mutex<HashMap<String, Channel>>>,
 }
 
-pub async fn handle_command(command: Command, client_id: usize, shared_state: &SharedState) -> Result<Vec<String>, String> {
+pub async fn handle_command(command: Command, client_id: usize, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     match command {
         Command::Nick(nickname) => handle_nick(client_id, nickname, shared_state),
         Command::User(username, _, realname) => handle_user(client_id, username, realname, shared_state),
@@ -38,12 +38,12 @@ pub async fn handle_command(command: Command, client_id: usize, shared_state: &S
     }
 }
 
-fn handle_nick(client_id: usize, nickname: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_nick(client_id: usize, nickname: String, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     let mut users = shared_state.users.lock().unwrap();
     let user = users.entry(client_id).or_insert_with(|| User::new(client_id, "0.0.0.0".parse().unwrap()));
     let old_nick = user.nickname.clone().unwrap_or_else(|| "<unknown>".to_string());
     user.set_nickname(nickname.clone())?;
-    Ok(vec![format!(":{} NICK :{}", old_nick, nickname)])
+    Ok(vec![(client_id, format!(":{} NICK :{}", old_nick, nickname))])
 }
 
 fn handle_user(client_id: usize, username: String, realname: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
@@ -140,7 +140,7 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
         let message_to_send = format!(":{} PRIVMSG {} :{}", sender_nick, target, message);
         Ok(channel.members.iter()
             .filter(|&&member_id| member_id != client_id)
-            .map(|_| message_to_send.clone())
+            .map(|&member_id| (member_id, message_to_send.clone()))
             .collect())
     } else {
         // Private message
@@ -148,7 +148,7 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
             .ok_or_else(|| format!("User {} not found", target))?;
         
         if target_user.id != client_id {
-            Ok(vec![format!(":{} PRIVMSG {} :{}", sender_nick, target, message)])
+            Ok(vec![(target_user.id, format!(":{} PRIVMSG {} :{}", sender_nick, target, message))])
         } else {
             Ok(vec![])
         }
