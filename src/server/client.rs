@@ -1,7 +1,6 @@
 
 use tokio::net::TcpStream;
 use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
-use tokio::sync::broadcast;
 use crate::commands::parser::parse_command;
 use crate::commands::handler::{handle_command, SharedState as HandlerSharedState};
 use crate::models::user::User;
@@ -13,70 +12,64 @@ pub struct Client {
     pub id: usize,
     pub stream: TcpStream,
     pub user: User,
-    pub tx: broadcast::Sender<String>,
-    pub rx: broadcast::Receiver<String>,
 }
 
 impl Client {
-    pub fn new(id: usize, stream: TcpStream, ip: std::net::IpAddr, tx: broadcast::Sender<String>) -> Self {
+    pub fn new(id: usize, stream: TcpStream, ip: std::net::IpAddr) -> Self {
         Client {
             id,
             stream,
             user: User::new(id, ip),
-            tx: tx.clone(),
-            rx: tx.subscribe(),
         }
     }
 
     pub async fn handle(&mut self, shared_state: Arc<ListenerSharedState>, log_level: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
         let (reader, mut writer) = self.stream.split();
-        let mut reader = BufReader::new(reader);
+        let mut reader = BufReader::new(reader).lines();
 
         let handler_shared_state = HandlerSharedState {
             users: Arc::clone(&shared_state.users),
             channels: Arc::clone(&shared_state.channels),
         };
 
-        loop {
-            let mut line = String::new();
-            tokio::select! {
-                result = reader.read_line(&mut line) => {
-                    match result {
-                        Ok(0) => break, // EOF
-                        Ok(_) => {
-                            if log_level == LevelFilter::Trace {
-                                log::trace!("Received from client {}: {}", self.id, line.trim());
-                            }
+        while let Some(line) = reader.next_line().await? {
+            log::trace!("Received from client {}: {}", self.id, line);
 
-                            if let Some(command) = parse_command(line.trim()) {
-                                if log_level >= LevelFilter::Debug {
-                                    log::debug!("Parsed command from client {}: {:?}", self.id, command);
-                                }
+            if let Some(command) = parse_command(&line) {
+                log::debug!("Parsed command from client {}: {:?}", self.id, command);
 
-                                let responses = handle_command(command, self.id, &handler_shared_state).await?;
-                                for response in responses {
-                                    // Send response directly to the client
-                                    writer.write_all(response.as_bytes()).await?;
-                                    writer.write_all(b"\r\n").await?;
-
-                                    if log_level == LevelFilter::Trace {
-                                        log::trace!("Sent to client {}: {}", self.id, response);
+                match handle_command(command, self.id, &handler_shared_state).await {
+                    Ok(responses) => {
+                        for response in responses {
+                            match writer.write_all(response.as_bytes()).await {
+                                Ok(_) => {
+                                    if let Err(e) = writer.write_all(b"\r\n").await {
+                                        log::error!("Error writing newline to client {}: {}", self.id, e);
+                                        return Err(Box::new(e));
                                     }
+                                    if let Err(e) = writer.flush().await {
+                                        log::error!("Error flushing writer for client {}: {}", self.id, e);
+                                        return Err(Box::new(e));
+                                    }
+                                    log::trace!("Sent to client {}: {}", self.id, response);
+                                }
+                                Err(e) => {
+                                    log::error!("Error writing to client {}: {}", self.id, e);
+                                    return Err(Box::new(e));
                                 }
                             }
                         }
-                        Err(e) => return Err(Box::new(e)),
                     }
-                }
-                result = self.rx.recv() => {
-                    match result {
-                        Ok(msg) => {
-                            writer.write_all(msg.as_bytes()).await?;
-                            writer.write_all(b"\r\n").await?;
+                    Err(e) => {
+                        log::error!("Error handling command for client {}: {}", self.id, e);
+                        if let Err(write_err) = writer.write_all(format!("ERROR :{}\r\n", e).as_bytes()).await {
+                            log::error!("Error writing error message to client {}: {}", self.id, write_err);
+                            return Err(Box::new(write_err));
                         }
-                        Err(e) => log::error!("Error receiving broadcast: {}", e),
                     }
                 }
+            } else {
+                log::warn!("Unable to parse command from client {}: {}", self.id, line);
             }
         }
 
