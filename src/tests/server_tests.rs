@@ -96,7 +96,7 @@ async fn test_two_clients_join_and_message() {
     // Read response on client2
     let mut buffer = [0; 1024];
     let n = client2.read(&mut buffer).await.unwrap();
-    let response = String::from_utf8_lossy(&buffer[..n]);
+    let mut response = String::from_utf8_lossy(&buffer[..n]).to_string();
 
     println!("Response received by client2: {}", response);
 
@@ -104,9 +104,11 @@ async fn test_two_clients_join_and_message() {
     if !response.contains("PRIVMSG #test :Hello, channel!") {
         // If not, wait a bit and try reading again
         tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        let n = client2.read(&mut buffer).await.unwrap();
-        let response = String::from_utf8_lossy(&buffer[..n]);
-        println!("Second response received by client2: {}", response);
+        let mut buffer2 = [0; 1024];
+        let n = client2.read(&mut buffer2).await.unwrap();
+        let second_response = String::from_utf8_lossy(&buffer2[..n]);
+        println!("Second response received by client2: {}", second_response);
+        response.push_str(&second_response);
     }
 
     assert!(response.contains("PRIVMSG #test :Hello, channel!"), "Unexpected response: {}", response);
