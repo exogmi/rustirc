@@ -7,7 +7,7 @@ use std::sync::Arc;
 async fn test_server_starts_and_accepts_connections() {
     // Start the server in a separate task
     let server_address = "127.0.0.1:8080";
-    let server_task = tokio::spawn(async move {
+    let _server_task = tokio::spawn(async move {
         if let Err(e) = start_server(server_address).await {
             eprintln!("Server error: {}", e);
         }
@@ -34,7 +34,7 @@ async fn test_client_disconnection() {
     let shared_state = Arc::new(SharedState::new());
     let server_state = shared_state.clone();
 
-    let server_task = tokio::spawn(async move {
+    let _server_task = tokio::spawn(async move {
         let listener = TcpListener::bind(server_address).await.unwrap();
         let (socket, addr) = listener.accept().await.unwrap();
         crate::server::listener::handle_client(socket, server_state, addr).await.unwrap();

@@ -40,7 +40,7 @@ pub async fn start_server(address: &str) -> Result<(), Box<dyn std::error::Error
     }
 }
 
-async fn handle_client(mut socket: tokio::net::TcpStream, state: Arc<SharedState>, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_client(mut socket: tokio::net::TcpStream, state: Arc<SharedState>, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
     let client_id = generate_client_id();
     
     // Initialize client state
