@@ -20,6 +20,12 @@ pub struct User {
 }
 
 impl User {
+    pub fn get_host(&self) -> &IpAddr {
+        &self.host
+    }
+}
+
+impl User {
     pub fn new(id: usize, host: IpAddr) -> Self {
         User {
             id,

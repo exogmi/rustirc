@@ -12,6 +12,20 @@ pub struct Channel {
 }
 
 impl Channel {
+    pub fn get_name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn get_key(&self) -> Option<&String> {
+        self.key.as_ref()
+    }
+
+    pub fn get_state_path(&self) -> Option<&PathBuf> {
+        self.state_path.as_ref()
+    }
+}
+
+impl Channel {
     pub fn new(name: String) -> Self {
         Channel {
             name,

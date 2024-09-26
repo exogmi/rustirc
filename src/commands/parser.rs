@@ -18,6 +18,7 @@ pub enum Command {
     Kick(String, String, Option<String>),
     Who(String),
     WhoisUser(String),
+    // TODO: Implement handlers for the following commands
     WhoisServer(String),
     WhoisOperator(String),
     WhoisIdle(String),

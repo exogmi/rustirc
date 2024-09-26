@@ -16,6 +16,12 @@ pub struct Message {
 }
 
 impl Message {
+    pub fn get_content(&self) -> &str {
+        &self.content
+    }
+}
+
+impl Message {
     pub fn new(sender_id: usize, recipient: Recipient, content: String) -> Self {
         Message {
             sender_id,

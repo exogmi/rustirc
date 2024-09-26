@@ -82,6 +82,8 @@ impl Client {
         Ok(())
     }
 
+    // TODO: This method might be useful for direct client communication in the future
+    #[allow(dead_code)]
     pub async fn send(&mut self, message: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.stream.write_all(message.as_bytes()).await?;
         self.stream.write_all(b"\r\n").await?;
