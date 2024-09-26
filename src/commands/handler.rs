@@ -79,11 +79,29 @@ fn handle_join(client_id: usize, channel_name: String, shared_state: &SharedStat
     if let Some(user) = users.get_mut(&client_id) {
         user.join_channel(channel_name.clone());
         let nick = user.nickname.clone().unwrap_or_else(|| client_id.to_string());
-        Ok(vec![
-            format!(":{} JOIN :{}", nick, channel_name),
-            format!(":{} 353 {} = {} :{}", "server", nick, channel_name, channel.members.iter().map(|&id| users.get(&id).and_then(|u| u.nickname.clone()).unwrap_or_else(|| id.to_string())).collect::<Vec<_>>().join(" ")),
-            format!(":{} 366 {} {} :End of /NAMES list", "server", nick, channel_name),
-        ])
+        let user_list = channel.members.iter()
+            .map(|&id| users.get(&id).and_then(|u| u.nickname.clone()).unwrap_or_else(|| id.to_string()))
+            .collect::<Vec<_>>()
+            .join(" ");
+        
+        let join_message = format!(":{} JOIN :{}", nick, channel_name);
+        let names_message = format!(":{} 353 {} = {} :{}", "server", nick, channel_name, user_list);
+        let end_of_names = format!(":{} 366 {} {} :End of /NAMES list", "server", nick, channel_name);
+        
+        let mut messages = vec![join_message.clone(), names_message.clone(), end_of_names.clone()];
+        
+        // Notify other channel members about the new user
+        for &member_id in &channel.members {
+            if member_id != client_id {
+                if let Some(member) = users.get(&member_id) {
+                    let member_nick = member.nickname.clone().unwrap_or_else(|| member_id.to_string());
+                    messages.push(format!(":{} 353 {} = {} :{}", "server", member_nick, channel_name, user_list));
+                    messages.push(format!(":{} 366 {} {} :End of /NAMES list", "server", member_nick, channel_name));
+                }
+            }
+        }
+        
+        Ok(messages)
     } else {
         Err("User not found".to_string())
     }
@@ -129,17 +147,23 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
             }
         };
 
-        let _msg = Message::new(client_id, recipient.clone(), message.clone());
+        let msg = Message::new(client_id, recipient.clone(), message.clone());
 
         match recipient {
             Recipient::Channel(channel_name) => {
-                if let Some(_channel) = channels.get(&channel_name) {
-                    Ok(vec![format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message)])
+                if let Some(channel) = channels.get(&channel_name) {
+                    let mut messages = Vec::new();
+                    for &member_id in &channel.members {
+                        if member_id != client_id {
+                            messages.push(format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message));
+                        }
+                    }
+                    Ok(messages)
                 } else {
                     Err(format!("Channel {} not found", channel_name))
                 }
             }
-            Recipient::User(_target_id) => {
+            Recipient::User(target_id) => {
                 Ok(vec![format!(":{} PRIVMSG {} :{}", sender_nick, target, message)])
             }
         }
