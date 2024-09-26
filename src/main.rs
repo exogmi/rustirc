@@ -7,13 +7,11 @@ mod server;
 mod tests;
 
 use clap::{App, Arg};
-use env_logger;
+use env_logger::Env;
+use log::LevelFilter;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize logging
-    env_logger::init();
-
     // Parse command-line arguments
     let matches = App::new("IRC Server")
         .version("1.0")
@@ -31,7 +29,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             .value_name("PORT")
             .help("Sets the port to listen on")
             .takes_value(true))
+        .arg(Arg::with_name("verbosity")
+            .short("v")
+            .long("verbosity")
+            .value_name("LEVEL")
+            .help("Sets the verbosity level (info, debug, trace)")
+            .takes_value(true))
         .get_matches();
+
+    // Set log level based on verbosity flag
+    let log_level = match matches.value_of("verbosity").unwrap_or("info") {
+        "debug" => LevelFilter::Debug,
+        "trace" => LevelFilter::Trace,
+        _ => LevelFilter::Info,
+    };
+
+    // Initialize logging
+    env_logger::Builder::from_env(Env::default())
+        .filter_level(log_level)
+        .init();
 
     // Set bind IP and port
     let bind_ip = matches.value_of("bind").unwrap_or("0.0.0.0");
@@ -41,5 +57,5 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     log::info!("Starting IRC server on {}", bind_address);
 
     // Start the server
-    server::listener::start_server(&bind_address).await
+    server::listener::start_server(&bind_address, log_level).await
 }

@@ -7,6 +7,7 @@ use crate::models::channel::Channel;
 use crate::utils::generate_client_id;
 use std::net::SocketAddr;
 use crate::server::client::Client;
+use log::LevelFilter;
 
 pub struct SharedState {
     pub users: Arc<Mutex<HashMap<usize, User>>>,
@@ -22,9 +23,9 @@ impl SharedState {
     }
 }
 
-pub async fn start_server(address: &str) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn start_server(address: &str, log_level: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(address).await?;
-    println!("Server listening on {}", address);
+    log::info!("Server listening on {}", address);
 
     let shared_state = Arc::new(SharedState::new());
 
@@ -33,14 +34,14 @@ pub async fn start_server(address: &str) -> Result<(), Box<dyn std::error::Error
         let state = Arc::clone(&shared_state);
 
         tokio::spawn(async move {
-            if let Err(e) = handle_client(socket, state, addr).await {
-                eprintln!("Error handling client {}: {}", addr, e);
+            if let Err(e) = handle_client(socket, state, addr, log_level).await {
+                log::error!("Error handling client {}: {}", addr, e);
             }
         });
     }
 }
 
-pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState>, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState>, addr: SocketAddr, log_level: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
     let client_id = generate_client_id();
     let mut client = Client::new(client_id, socket, addr.ip());
     
@@ -50,9 +51,9 @@ pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState
         users.insert(client_id, client.user.clone());
     }
 
-    println!("New client connected: {}", addr);
+    log::info!("New client connected: {}", addr);
 
-    client.handle(state.clone()).await?;
+    client.handle(state.clone(), log_level).await?;
 
     // Clean up client state
     {
@@ -60,6 +61,6 @@ pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState
         users.remove(&client_id);
     }
 
-    println!("Client disconnected: {}", addr);
+    log::info!("Client disconnected: {}", addr);
     Ok(())
 }
