@@ -42,9 +42,11 @@ impl Client {
                         for response in responses {
                             if response.starts_with(':') && response.contains("PRIVMSG") {
                                 // This is a message that needs to be sent to other clients
+                                log::trace!("Sending to other clients: {}", response);
                                 shared_state.tx.send(response.clone()).unwrap();
                             } else {
                                 // This is a response to the current client
+                                log::trace!("Sending to client {}: {}", self.id, response);
                                 writer.write_all(response.as_bytes()).await?;
                                 writer.write_all(b"\r\n").await?;
                             }
