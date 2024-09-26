@@ -22,7 +22,7 @@ impl Client {
         }
     }
 
-    pub async fn handle(&mut self, shared_state: Arc<ListenerSharedState>) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn handle(&mut self, shared_state: Arc<ListenerSharedState>) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let (reader, mut writer) = self.stream.split();
         let mut reader = BufReader::new(reader).lines();
 
@@ -65,7 +65,7 @@ impl Client {
         Ok(())
     }
 
-    pub async fn send(&mut self, message: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn send(&mut self, message: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         self.stream.write_all(message.as_bytes()).await?;
         self.stream.write_all(b"\r\n").await?;
         Ok(())

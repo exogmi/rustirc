@@ -61,7 +61,7 @@ pub async fn start_server(address: &str, _log_level: LevelFilter) -> Result<(), 
     }
 }
 
-pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState>, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState>, addr: SocketAddr) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let client_id = generate_client_id();
     let mut client = Client::new(client_id, socket, addr.ip());
     
