@@ -123,7 +123,7 @@ fn handle_part(client_id: usize, channel_name: String, shared_state: &SharedStat
     Ok(vec![format!(":{} PART :{}", nick, channel_name)])
 }
 
-fn handle_privmsg(client_id: usize, target: String, message: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_privmsg(client_id: usize, target: String, message: String, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     let users = shared_state.users.lock().unwrap();
     let channels = shared_state.channels.lock().unwrap();
 
