@@ -131,49 +131,33 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
     let users = shared_state.users.lock().unwrap();
     let channels = shared_state.channels.lock().unwrap();
 
-    if let Some(sender) = users.get(&client_id) {
-        let sender_nick = sender.nickname.clone().unwrap_or_else(|| client_id.to_string());
-        let recipient = if target.starts_with('#') {
-            if let Some(channel) = channels.get(&target) {
-                if !channel.members.contains(&client_id) {
-                    return Err(format!("You're not on that channel"));
-                }
-                Recipient::Channel(target.clone())
-            } else {
-                return Err(format!("Channel {} not found", target));
-            }
-        } else {
-            if let Some(target_user) = users.values().find(|u| u.nickname.as_ref() == Some(&target)) {
-                Recipient::User(target_user.id)
-            } else {
-                return Err(format!("User {} not found", target));
-            }
-        };
+    let sender = users.get(&client_id).ok_or_else(|| "User not found".to_string())?;
+    let sender_nick = sender.nickname.clone().unwrap_or_else(|| client_id.to_string());
 
-        match recipient {
-            Recipient::Channel(channel_name) => {
-                if let Some(channel) = channels.get(&channel_name) {
-                    let mut messages = Vec::new();
-                    for &member_id in &channel.members {
-                        if member_id != client_id {
-                            messages.push((member_id, format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message)));
-                        }
-                    }
-                    Ok(messages.into_iter().map(|(_, msg)| msg).collect())
-                } else {
-                    Err(format!("Channel {} not found", channel_name))
-                }
-            }
-            Recipient::User(target_id) => {
-                if target_id != client_id {
-                    Ok(vec![format!(":{} PRIVMSG {} :{}", sender_nick, target, message)])
-                } else {
-                    Ok(vec![])
-                }
+    if target.starts_with('#') {
+        // Channel message
+        let channel = channels.get(&target).ok_or_else(|| format!("Channel {} not found", target))?;
+        if !channel.members.contains(&client_id) {
+            return Err("You're not on that channel".to_string());
+        }
+
+        let mut messages = Vec::new();
+        for &member_id in &channel.members {
+            if member_id != client_id {
+                messages.push(format!(":{} PRIVMSG {} :{}", sender_nick, target, message));
             }
         }
+        Ok(messages)
     } else {
-        Err("User not found".to_string())
+        // Private message
+        let target_user = users.values().find(|u| u.nickname.as_ref() == Some(&target))
+            .ok_or_else(|| format!("User {} not found", target))?;
+        
+        if target_user.id != client_id {
+            Ok(vec![format!(":{} PRIVMSG {} :{}", sender_nick, target, message)])
+        } else {
+            Ok(vec![])
+        }
     }
 }
 

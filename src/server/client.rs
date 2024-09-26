@@ -40,25 +40,17 @@ impl Client {
                 match handle_command(command, self.id, &handler_shared_state).await {
                     Ok(responses) => {
                         for response in responses {
-                            if let Err(e) = writer.write_all(response.as_bytes()).await {
+                            if let Err(e) = self.send_message(&response).await {
                                 log::error!("Error sending message to client {}: {}", self.id, e);
-                                return Err(Box::new(e));
-                            }
-                            if let Err(e) = writer.write_all(b"\r\n").await {
-                                log::error!("Error sending message to client {}: {}", self.id, e);
-                                return Err(Box::new(e));
-                            }
-                            if let Err(e) = writer.flush().await {
-                                log::error!("Error flushing message to client {}: {}", self.id, e);
-                                return Err(Box::new(e));
+                                return Err(e);
                             }
                         }
                     }
                     Err(e) => {
                         log::error!("Error handling command for client {}: {}", self.id, e);
-                        if let Err(write_err) = writer.write_all(format!("ERROR :{}\r\n", e).as_bytes()).await {
+                        if let Err(write_err) = self.send_message(&format!("ERROR :{}", e)).await {
                             log::error!("Error writing error message to client {}: {}", self.id, write_err);
-                            return Err(Box::new(write_err));
+                            return Err(write_err);
                         }
                     }
                 }
@@ -67,6 +59,13 @@ impl Client {
             }
         }
 
+        Ok(())
+    }
+
+    async fn send_message(&mut self, message: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.stream.write_all(message.as_bytes()).await?;
+        self.stream.write_all(b"\r\n").await?;
+        self.stream.flush().await?;
         Ok(())
     }
 

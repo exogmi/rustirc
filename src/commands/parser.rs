@@ -58,7 +58,7 @@ pub fn parse_command(input: &str) -> Option<Command> {
             let mut mode_parts = params.splitn(3, ' ');
             Some(Command::Mode(
                 mode_parts.next()?.to_string(),
-                mode_parts.next()?.to_string(),
+                mode_parts.next().unwrap_or_default().to_string(),
                 mode_parts.next().map(|s| s.to_string()),
             ))
         }
