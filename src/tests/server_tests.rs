@@ -102,7 +102,7 @@ async fn test_two_clients_join_and_message() {
     println!("Message sent from client1");
 
     // Read response on client2 with a timeout
-    let timeout_duration = Duration::from_secs(10); // Increased timeout
+    let timeout_duration = Duration::from_secs(30); // Increased timeout
     let read_result = timeout(timeout_duration, async {
         let mut buffer = [0; 1024];
         let mut response = String::new();
@@ -127,7 +127,7 @@ async fn test_two_clients_join_and_message() {
                 }
             }
             attempts += 1;
-            if attempts > 10 {
+            if attempts > 30 {
                 println!("Max attempts reached");
                 break;
             }

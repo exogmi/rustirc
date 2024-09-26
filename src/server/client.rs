@@ -53,9 +53,13 @@ impl Client {
 
                                 let responses = handle_command(command, self.id, &handler_shared_state).await?;
                                 for response in responses {
+                                    // Only send to this client if it's a direct response
+                                    if !response.starts_with(':') || response.starts_with(&format!(":{}", self.user.nickname.as_ref().unwrap_or(&self.id.to_string()))) {
+                                        writer.write_all(response.as_bytes()).await?;
+                                        writer.write_all(b"\r\n").await?;
+                                    }
+                                    // Broadcast to all clients
                                     self.tx.send(response.clone())?;
-                                    writer.write_all(response.as_bytes()).await?;
-                                    writer.write_all(b"\r\n").await?;
 
                                     if log_level == LevelFilter::Trace {
                                         log::trace!("Sent to client {}: {}", self.id, response);
@@ -70,8 +74,11 @@ impl Client {
                 result = self.rx.recv() => {
                     match result {
                         Ok(msg) => {
-                            writer.write_all(msg.as_bytes()).await?;
-                            writer.write_all(b"\r\n").await?;
+                            // Only write to this client if it's not the sender
+                            if !msg.starts_with(&format!(":{}", self.user.nickname.as_ref().unwrap_or(&self.id.to_string()))) {
+                                writer.write_all(msg.as_bytes()).await?;
+                                writer.write_all(b"\r\n").await?;
+                            }
                         }
                         Err(e) => log::error!("Error receiving broadcast: {}", e),
                     }

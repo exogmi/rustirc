@@ -57,7 +57,7 @@ pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState
 
     log::info!("New client connected: {}", addr);
 
-    client.handle(state.clone(), log_level).await?;
+    let result = client.handle(state.clone(), log_level).await;
 
     // Clean up client state
     {
@@ -66,5 +66,5 @@ pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState
     }
 
     log::info!("Client disconnected: {}", addr);
-    Ok(())
+    result
 }
