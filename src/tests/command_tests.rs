@@ -187,6 +187,21 @@ async fn test_handle_privmsg_no_echo() {
     let users = shared_state.users.lock().unwrap();
     let sender = users.get(&1).unwrap();
     assert!(!messages.iter().any(|msg| msg.contains(&sender.nickname.clone().unwrap())));
+
+    // Test private message
+    let command = Command::PrivMsg("user2".to_string(), "Hello, user2!".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0], ":user1 PRIVMSG user2 :Hello, user2!");
+
+    // Test self-message (should be empty)
+    let command = Command::PrivMsg("user1".to_string(), "Hello, myself!".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, Vec::<String>::new());
 }
 
 #[tokio::test]
