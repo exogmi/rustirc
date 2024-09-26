@@ -41,23 +41,19 @@ pub async fn start_server(address: &str, _log_level: LevelFilter) -> Result<(), 
             let mut rx = state.tx.subscribe();
             let mut client = Client::new(generate_client_id(), socket, addr.ip());
 
-            tokio::select! {
-                result = client.handle(Arc::clone(&state)) => {
-                    if let Err(e) = result {
-                        log::error!("Error handling client {}: {}", addr, e);
+            loop {
+                tokio::select! {
+                    result = client.handle(Arc::clone(&state)) => {
+                        if let Err(e) = result {
+                            log::error!("Error handling client {}: {}", addr, e);
+                        }
+                        break;
                     }
-                }
-                result = async {
-                    while let Ok(msg) = rx.recv().await {
+                    Ok(msg) = rx.recv() => {
                         if let Err(e) = client.send(&msg).await {
                             log::error!("Error sending message to client {}: {}", addr, e);
                             break;
                         }
-                    }
-                    Ok::<(), Box<dyn std::error::Error>>(())
-                } => {
-                    if let Err(e) = result {
-                        log::error!("Error in message distribution for client {}: {}", addr, e);
                     }
                 }
             }
