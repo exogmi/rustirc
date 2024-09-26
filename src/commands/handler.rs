@@ -2,7 +2,7 @@
 use crate::commands::parser::Command;
 use crate::models::user::User;
 use crate::models::channel::Channel;
-use crate::models::message::{Message, Recipient};
+use crate::models::message::Recipient;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

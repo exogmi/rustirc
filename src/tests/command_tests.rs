@@ -151,7 +151,7 @@ async fn test_handle_privmsg_command() {
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec![]);
+    assert_eq!(messages, Vec::<String>::new());
 }
 
 #[tokio::test]
