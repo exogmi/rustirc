@@ -156,10 +156,10 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
                     let mut messages = Vec::new();
                     for &member_id in &channel.members {
                         if member_id != client_id {
-                            messages.push(format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message));
+                            messages.push((member_id, format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message)));
                         }
                     }
-                    Ok(messages)
+                    Ok(messages.into_iter().map(|(_, msg)| msg).collect())
                 } else {
                     Err(format!("Channel {} not found", channel_name))
                 }

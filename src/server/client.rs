@@ -40,22 +40,9 @@ impl Client {
                 match handle_command(command, self.id, &handler_shared_state).await {
                     Ok(responses) => {
                         for response in responses {
-                            match writer.write_all(response.as_bytes()).await {
-                                Ok(_) => {
-                                    if let Err(e) = writer.write_all(b"\r\n").await {
-                                        log::error!("Error writing newline to client {}: {}", self.id, e);
-                                        return Err(Box::new(e));
-                                    }
-                                    if let Err(e) = writer.flush().await {
-                                        log::error!("Error flushing writer for client {}: {}", self.id, e);
-                                        return Err(Box::new(e));
-                                    }
-                                    log::trace!("Sent to client {}: {}", self.id, response);
-                                }
-                                Err(e) => {
-                                    log::error!("Error writing to client {}: {}", self.id, e);
-                                    return Err(Box::new(e));
-                                }
+                            if let Err(e) = self.send_message(&response).await {
+                                log::error!("Error sending message to client {}: {}", self.id, e);
+                                return Err(e);
                             }
                         }
                     }
@@ -78,6 +65,14 @@ impl Client {
     pub async fn send(&mut self, message: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.stream.write_all(message.as_bytes()).await?;
         self.stream.write_all(b"\r\n").await?;
+        Ok(())
+    }
+
+    async fn send_message(&mut self, message: &str) -> Result<(), Box<dyn std::error::Error>> {
+        self.stream.write_all(message.as_bytes()).await?;
+        self.stream.write_all(b"\r\n").await?;
+        self.stream.flush().await?;
+        log::trace!("Sent to client {}: {}", self.id, message);
         Ok(())
     }
 }
