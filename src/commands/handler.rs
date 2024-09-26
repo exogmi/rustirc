@@ -274,11 +274,11 @@ fn handle_list(client_id: usize, channel: Option<String>, shared_state: &SharedS
     response.push((client_id, format!(":{} 323 :End of /LIST", "server")));
     Ok(response)
 }
-fn handle_cap(_client_id: usize, subcommand: String, _param: Option<String>, _shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_cap(client_id: usize, subcommand: String, _param: Option<String>, _shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     match subcommand.as_str() {
-        "LS" => Ok(vec!["CAP * LS :".to_string()]),
-        "REQ" => Ok(vec!["CAP * ACK :".to_string()]),
+        "LS" => Ok(vec![(client_id, "CAP * LS :".to_string())]),
+        "REQ" => Ok(vec![(client_id, "CAP * ACK :".to_string())]),
         "END" => Ok(vec![]),
-        _ => Ok(vec![format!("Unknown CAP subcommand: {}", subcommand)]),
+        _ => Ok(vec![(client_id, format!("Unknown CAP subcommand: {}", subcommand))]),
     }
 }
