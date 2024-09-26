@@ -140,13 +140,8 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
             return Err("You're not on that channel".to_string());
         }
 
-        let mut messages = Vec::new();
-        for &member_id in &channel.members {
-            if member_id != client_id {
-                messages.push(format!(":{} PRIVMSG {} :{}", sender_nick, target, message));
-            }
-        }
-        Ok(messages)
+        let message_to_send = format!(":{} PRIVMSG {} :{}", sender_nick, target, message);
+        Ok(vec![message_to_send])
     } else {
         // Private message
         let target_user = users.values().find(|u| u.nickname.as_ref() == Some(&target))

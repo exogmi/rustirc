@@ -40,8 +40,14 @@ impl Client {
                 match handle_command(command, self.id, &handler_shared_state).await {
                     Ok(responses) => {
                         for response in responses {
-                            writer.write_all(response.as_bytes()).await?;
-                            writer.write_all(b"\r\n").await?;
+                            if response.starts_with(':') && response.contains("PRIVMSG") {
+                                // This is a message that needs to be sent to other clients
+                                shared_state.tx.send(response.clone()).unwrap();
+                            } else {
+                                // This is a response to the current client
+                                writer.write_all(response.as_bytes()).await?;
+                                writer.write_all(b"\r\n").await?;
+                            }
                         }
                         writer.flush().await?;
                     }
