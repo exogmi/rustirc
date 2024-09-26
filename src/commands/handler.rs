@@ -22,8 +22,8 @@ pub async fn handle_command(command: Command, client_id: usize, shared_state: &S
         Command::Pong(_) => handle_pong(client_id, shared_state),
         Command::Mode(_, _, _) => Ok(vec![(client_id, "MODE command not implemented yet".to_string())]),
         Command::Topic(channel, topic) => handle_topic(client_id, channel, topic, shared_state),
-        Command::Names(channel) => handle_names(channel, shared_state).map(|messages| messages.into_iter().map(|msg| (client_id, msg)).collect()),
-        Command::List(channel) => handle_list(channel, shared_state).map(|messages| messages.into_iter().map(|msg| (client_id, msg)).collect()),
+        Command::Names(channel) => handle_names(client_id, channel, shared_state),
+        Command::List(channel) => handle_list(client_id, channel, shared_state),
         Command::Invite(_, _) => Ok(vec![(client_id, "INVITE command not implemented yet".to_string())]),
         Command::Kick(_, _, _) => Ok(vec![(client_id, "KICK command not implemented yet".to_string())]),
         Command::Who(_) => Ok(vec![(client_id, "WHO command not implemented yet".to_string())]),
@@ -34,7 +34,7 @@ pub async fn handle_command(command: Command, client_id: usize, shared_state: &S
         Command::WhoisChannels(_) => Ok(vec![(client_id, "WHOIS command not implemented yet".to_string())]),
         Command::WhoisAuth(_) => Ok(vec![(client_id, "WHOIS command not implemented yet".to_string())]),
         Command::Whowas(_, _, _) => Ok(vec![(client_id, "WHOWAS command not implemented yet".to_string())]),
-        Command::Cap(subcommand, param) => handle_cap(client_id, subcommand, param, shared_state).map(|messages| messages.into_iter().map(|msg| (client_id, msg)).collect()),
+        Command::Cap(subcommand, param) => handle_cap(client_id, subcommand, param, shared_state),
     }
 }
 
@@ -202,7 +202,7 @@ fn handle_pong(client_id: usize, shared_state: &SharedState) -> Result<Vec<(usiz
     }
 }
 
-fn handle_topic(client_id: usize, channel_name: String, topic: Option<String>, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_topic(client_id: usize, channel_name: String, topic: Option<String>, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     let mut channels = shared_state.channels.lock().unwrap();
     let users = shared_state.users.lock().unwrap();
 
@@ -212,12 +212,12 @@ fn handle_topic(client_id: usize, channel_name: String, topic: Option<String>, s
             match topic {
                 Some(new_topic) => {
                     channel.set_topic(new_topic.clone());
-                    Ok(vec![format!(":{} TOPIC {} :{}", nick, channel_name, new_topic)])
+                    Ok(vec![(client_id, format!(":{} TOPIC {} :{}", nick, channel_name, new_topic))])
                 }
                 None => {
                     match &channel.topic {
-                        Some(current_topic) => Ok(vec![format!(":{} 332 {} {} :{}", "server", nick, channel_name, current_topic)]),
-                        None => Ok(vec![format!(":{} 331 {} {} :No topic is set", "server", nick, channel_name)]),
+                        Some(current_topic) => Ok(vec![(client_id, format!(":{} 332 {} {} :{}", "server", nick, channel_name, current_topic))]),
+                        None => Ok(vec![(client_id, format!(":{} 331 {} {} :No topic is set", "server", nick, channel_name))]),
                     }
                 }
             }
@@ -229,7 +229,7 @@ fn handle_topic(client_id: usize, channel_name: String, topic: Option<String>, s
     }
 }
 
-fn handle_names(channel_name: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_names(client_id: usize, channel_name: String, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     let channels = shared_state.channels.lock().unwrap();
     let users = shared_state.users.lock().unwrap();
 
@@ -241,23 +241,23 @@ fn handle_names(channel_name: String, shared_state: &SharedState) -> Result<Vec<
             .join(" ");
 
         Ok(vec![
-            format!(":{} 353 * = {} :{}", "server", channel_name, user_list),
-            format!(":{} 366 * {} :End of /NAMES list", "server", channel_name),
+            (client_id, format!(":{} 353 * = {} :{}", "server", channel_name, user_list)),
+            (client_id, format!(":{} 366 * {} :End of /NAMES list", "server", channel_name)),
         ])
     } else {
         Err(format!("Channel {} not found", channel_name))
     }
 }
 
-fn handle_list(channel: Option<String>, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_list(client_id: usize, channel: Option<String>, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     let channels = shared_state.channels.lock().unwrap();
 
-    let mut response = vec![format!(":{} 321 Channel :Users Name", "server")];
+    let mut response = vec![(client_id, format!(":{} 321 Channel :Users Name", "server"))];
 
     match channel {
         Some(channel_name) => {
             if let Some(channel) = channels.get(&channel_name) {
-                response.push(format!(":{} 322 {} {} :{}", "server", channel_name, channel.members.len(), channel.topic.clone().unwrap_or_default()));
+                response.push((client_id, format!(":{} 322 {} {} :{}", "server", channel_name, channel.members.len(), channel.topic.clone().unwrap_or_default())));
             } else {
                 return Err(format!("Channel {} not found", channel_name));
             }
@@ -266,12 +266,12 @@ fn handle_list(channel: Option<String>, shared_state: &SharedState) -> Result<Ve
             let mut channel_list: Vec<_> = channels.iter().collect();
             channel_list.sort_by(|a, b| a.0.cmp(b.0));
             for (name, channel) in channel_list {
-                response.push(format!(":{} 322 {} {} :{}", "server", name, channel.members.len(), channel.topic.clone().unwrap_or_default()));
+                response.push((client_id, format!(":{} 322 {} {} :{}", "server", name, channel.members.len(), channel.topic.clone().unwrap_or_default())));
             }
         }
     }
 
-    response.push(format!(":{} 323 :End of /LIST", "server"));
+    response.push((client_id, format!(":{} 323 :End of /LIST", "server")));
     Ok(response)
 }
 fn handle_cap(_client_id: usize, subcommand: String, _param: Option<String>, _shared_state: &SharedState) -> Result<Vec<String>, String> {
