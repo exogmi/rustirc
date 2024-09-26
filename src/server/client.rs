@@ -1,6 +1,6 @@
 
 use tokio::net::TcpStream;
-use tokio::io::{AsyncReadExt, AsyncWriteExt, BufReader, AsyncBufReadExt};
+use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
 use crate::commands::parser::parse_command;
 use crate::commands::handler::handle_command;
 use crate::models::user::User;
@@ -28,7 +28,7 @@ impl Client {
 
         while let Some(line) = reader.next_line().await? {
             if let Some(command) = parse_command(&line) {
-                let responses = handle_command(command, self.id, &shared_state).await?;
+                let responses = handle_command(command, self.id, shared_state.as_ref()).await?;
                 for response in responses {
                     writer.write_all(response.as_bytes()).await?;
                     writer.write_all(b"\r\n").await?;

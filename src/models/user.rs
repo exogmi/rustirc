@@ -8,7 +8,7 @@ pub enum UserStatus {
     Away(Option<String>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct User {
     pub id: usize,
     pub nickname: Option<String>,
