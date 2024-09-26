@@ -8,17 +8,21 @@ use crate::utils::generate_client_id;
 use std::net::SocketAddr;
 use crate::server::client::Client;
 use log::LevelFilter;
+use tokio::sync::broadcast;
 
 pub struct SharedState {
     pub users: Arc<Mutex<HashMap<usize, User>>>,
     pub channels: Arc<Mutex<HashMap<String, Channel>>>,
+    pub tx: broadcast::Sender<String>,
 }
 
 impl SharedState {
     pub fn new() -> Self {
+        let (tx, _) = broadcast::channel(100);
         SharedState {
             users: Arc::new(Mutex::new(HashMap::new())),
             channels: Arc::new(Mutex::new(HashMap::new())),
+            tx,
         }
     }
 }
