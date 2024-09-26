@@ -54,7 +54,7 @@ pub async fn start_server(address: &str, _log_level: LevelFilter) -> Result<(), 
                             break;
                         }
                     }
-                    Ok(())
+                    Ok::<(), Box<dyn std::error::Error>>(())
                 } => {
                     if let Err(e) = result {
                         log::error!("Error in message distribution for client {}: {}", addr, e);
