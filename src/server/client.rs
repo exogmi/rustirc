@@ -40,18 +40,12 @@ impl Client {
                 match handle_command(command, self.id, &handler_shared_state).await {
                     Ok(responses) => {
                         for response in responses {
-                            if let Err(e) = self.send_message(&response).await {
-                                log::error!("Error sending message to client {}: {}", self.id, e);
-                                return Err(e);
-                            }
+                            self.send(&response).await?;
                         }
                     }
                     Err(e) => {
                         log::error!("Error handling command for client {}: {}", self.id, e);
-                        if let Err(write_err) = self.send_message(&format!("ERROR :{}", e)).await {
-                            log::error!("Error writing error message to client {}: {}", self.id, write_err);
-                            return Err(write_err);
-                        }
+                        self.send(&format!("ERROR :{}", e)).await?;
                     }
                 }
             } else {
