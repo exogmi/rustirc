@@ -23,7 +23,7 @@ impl Client {
     }
 
     pub async fn handle(&mut self, shared_state: Arc<ListenerSharedState>) -> Result<(), Box<dyn std::error::Error>> {
-        let (reader, _writer) = self.stream.split();
+        let (reader, mut writer) = self.stream.split();
         let mut reader = BufReader::new(reader).lines();
 
         let handler_shared_state = HandlerSharedState {
@@ -40,12 +40,15 @@ impl Client {
                 match handle_command(command, self.id, &handler_shared_state).await {
                     Ok(responses) => {
                         for response in responses {
-                            self.send(&response).await?;
+                            writer.write_all(response.as_bytes()).await?;
+                            writer.write_all(b"\r\n").await?;
                         }
+                        writer.flush().await?;
                     }
                     Err(e) => {
                         log::error!("Error handling command for client {}: {}", self.id, e);
-                        self.send(&format!("ERROR :{}", e)).await?;
+                        writer.write_all(format!("ERROR :{}\r\n", e).as_bytes()).await?;
+                        writer.flush().await?;
                     }
                 }
             } else {
@@ -53,13 +56,6 @@ impl Client {
             }
         }
 
-        Ok(())
-    }
-
-    async fn send_message(&mut self, message: &str) -> Result<(), Box<dyn std::error::Error>> {
-        self.stream.write_all(message.as_bytes()).await?;
-        self.stream.write_all(b"\r\n").await?;
-        self.stream.flush().await?;
         Ok(())
     }
 
