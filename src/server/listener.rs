@@ -73,7 +73,28 @@ pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState
 
     log::info!("New client connected: {}", addr);
 
-    let result = client.handle(state.clone()).await;
+    let mut rx = state.tx.subscribe();
+
+    loop {
+        tokio::select! {
+            result = client.handle(state.clone()) => {
+                if let Err(e) = result {
+                    log::error!("Error handling client {}: {}", addr, e);
+                }
+                break;
+            }
+            Ok(msg) = rx.recv() => {
+                if let Some((recipient_id, message)) = msg.split_once(':') {
+                    if recipient_id.parse::<usize>().ok() == Some(client_id) {
+                        if let Err(e) = client.send(message).await {
+                            log::error!("Error sending message to client {}: {}", addr, e);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     // Clean up client state
     {
@@ -82,5 +103,5 @@ pub async fn handle_client(socket: tokio::net::TcpStream, state: Arc<SharedState
     }
 
     log::info!("Client disconnected: {}", addr);
-    result
+    Ok(())
 }

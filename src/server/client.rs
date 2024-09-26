@@ -48,7 +48,7 @@ impl Client {
                             } else {
                                 // This is a message that needs to be sent to other clients
                                 log::trace!("Sending to client {}: {}", recipient_id, response);
-                                shared_state.tx.send(response).unwrap();
+                                shared_state.tx.send(format!("{}:{}", recipient_id, response)).unwrap();
                             }
                         }
                         writer.flush().await?;
