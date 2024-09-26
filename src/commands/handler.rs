@@ -40,13 +40,10 @@ pub async fn handle_command(command: Command, client_id: usize, shared_state: &S
 
 fn handle_nick(client_id: usize, nickname: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
     let mut users = shared_state.users.lock().unwrap();
-    if let Some(user) = users.get_mut(&client_id) {
-        let old_nick = user.nickname.clone().unwrap_or_else(|| "<unknown>".to_string());
-        user.set_nickname(nickname.clone())?;
-        Ok(vec![format!(":{} NICK :{}", old_nick, nickname)])
-    } else {
-        Err("User not found".to_string())
-    }
+    let user = users.entry(client_id).or_insert_with(|| User::new(client_id, "0.0.0.0".parse().unwrap()));
+    let old_nick = user.nickname.clone().unwrap_or_else(|| "<unknown>".to_string());
+    user.set_nickname(nickname.clone())?;
+    Ok(vec![format!(":{} NICK :{}", old_nick, nickname)])
 }
 
 fn handle_user(client_id: usize, username: String, realname: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
