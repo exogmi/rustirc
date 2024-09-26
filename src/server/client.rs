@@ -30,7 +30,7 @@ impl Client {
 
     pub async fn handle(&mut self, shared_state: Arc<ListenerSharedState>, log_level: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
         let (reader, mut writer) = self.stream.split();
-        let mut reader = BufReader::new(reader).lines();
+        let mut reader = BufReader::new(reader);
 
         let handler_shared_state = HandlerSharedState {
             users: Arc::clone(&shared_state.users),
@@ -38,23 +38,26 @@ impl Client {
         };
 
         loop {
+            let mut line = String::new();
             tokio::select! {
-                result = reader.next_line() => {
+                result = reader.read_line(&mut line) => {
                     match result {
-                        Ok(Some(line)) => {
+                        Ok(0) => break, // EOF
+                        Ok(_) => {
                             if log_level == LevelFilter::Trace {
-                                log::trace!("Received from client {}: {}", self.id, line);
+                                log::trace!("Received from client {}: {}", self.id, line.trim());
                             }
 
-                            if let Some(command) = parse_command(&line) {
+                            if let Some(command) = parse_command(line.trim()) {
                                 if log_level >= LevelFilter::Debug {
                                     log::debug!("Parsed command from client {}: {:?}", self.id, command);
                                 }
 
                                 let responses = handle_command(command, self.id, &handler_shared_state).await?;
                                 for response in responses {
-                                    // Broadcast to all clients
-                                    self.tx.send(response.clone())?;
+                                    // Send response directly to the client
+                                    writer.write_all(response.as_bytes()).await?;
+                                    writer.write_all(b"\r\n").await?;
 
                                     if log_level == LevelFilter::Trace {
                                         log::trace!("Sent to client {}: {}", self.id, response);
@@ -62,7 +65,6 @@ impl Client {
                                 }
                             }
                         }
-                        Ok(None) => break,
                         Err(e) => return Err(Box::new(e)),
                     }
                 }
@@ -81,8 +83,6 @@ impl Client {
         Ok(())
     }
 
-    // TODO: This method might be useful for direct client communication in the future
-    #[allow(dead_code)]
     pub async fn send(&mut self, message: &str) -> Result<(), Box<dyn std::error::Error>> {
         self.stream.write_all(message.as_bytes()).await?;
         self.stream.write_all(b"\r\n").await?;
