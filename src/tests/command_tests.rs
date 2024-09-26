@@ -155,6 +155,41 @@ async fn test_handle_privmsg_command() {
 }
 
 #[tokio::test]
+async fn test_handle_privmsg_no_echo() {
+    let mut users = HashMap::new();
+    let mut user1 = User::new(1, "127.0.0.1".parse().unwrap());
+    user1.set_nickname("user1".to_string()).unwrap();
+    users.insert(1, user1);
+    let mut user2 = User::new(2, "127.0.0.1".parse().unwrap());
+    user2.set_nickname("user2".to_string()).unwrap();
+    users.insert(2, user2);
+
+    let mut channels = HashMap::new();
+    let mut channel = Channel::new("#testchannel".to_string());
+    channel.add_member(1);
+    channel.add_member(2);
+    channels.insert("#testchannel".to_string(), channel);
+
+    let shared_state = SharedState {
+        users: Arc::new(Mutex::new(users)),
+        channels: Arc::new(Mutex::new(channels)),
+    };
+
+    // Test channel message
+    let command = Command::PrivMsg("#testchannel".to_string(), "Hello, channel!".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages.len(), 1);
+    assert_eq!(messages[0], ":user1 PRIVMSG #testchannel :Hello, channel!");
+
+    // Verify that the message is not echoed back to the sender
+    let users = shared_state.users.lock().unwrap();
+    let sender = users.get(&1).unwrap();
+    assert!(!messages.iter().any(|msg| msg.contains(&sender.nickname.clone().unwrap())));
+}
+
+#[tokio::test]
 async fn test_handle_quit_command() {
     let mut users = HashMap::new();
     let mut user = User::new(1, "127.0.0.1".parse().unwrap());

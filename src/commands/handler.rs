@@ -138,7 +138,10 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
         }
 
         let message_to_send = format!(":{} PRIVMSG {} :{}", sender_nick, target, message);
-        Ok(vec![message_to_send])
+        Ok(channel.members.iter()
+            .filter(|&&member_id| member_id != client_id)
+            .map(|_| message_to_send.clone())
+            .collect())
     } else {
         // Private message
         let target_user = users.values().find(|u| u.nickname.as_ref() == Some(&target))
