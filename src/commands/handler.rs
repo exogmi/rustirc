@@ -107,7 +107,7 @@ fn handle_join(client_id: usize, channel_name: String, shared_state: &SharedStat
     }
 }
 
-fn handle_part(client_id: usize, channel_name: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_part(client_id: usize, channel_name: String, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     let mut channels = shared_state.channels.lock().unwrap();
     let mut users = shared_state.users.lock().unwrap();
 
@@ -124,7 +124,7 @@ fn handle_part(client_id: usize, channel_name: String, shared_state: &SharedStat
     }
 
     user.leave_channel(&channel_name);
-    Ok(vec![format!(":{} PART :{}", nick, channel_name)])
+    Ok(vec![(client_id, format!(":{} PART :{}", nick, channel_name))])
 }
 
 fn handle_privmsg(client_id: usize, target: String, message: String, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
