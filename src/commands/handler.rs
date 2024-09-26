@@ -155,7 +155,9 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
                 if let Some(channel) = channels.get(&channel_name) {
                     let mut messages = Vec::new();
                     for &member_id in &channel.members {
-                        messages.push(format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message));
+                        if member_id != client_id {
+                            messages.push(format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message));
+                        }
                     }
                     Ok(messages)
                 } else {
@@ -163,7 +165,11 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
                 }
             }
             Recipient::User(target_id) => {
-                Ok(vec![format!(":{} PRIVMSG {} :{}", sender_nick, target, message)])
+                if target_id != client_id {
+                    Ok(vec![format!(":{} PRIVMSG {} :{}", sender_nick, target, message)])
+                } else {
+                    Ok(vec![])
+                }
             }
         }
     } else {

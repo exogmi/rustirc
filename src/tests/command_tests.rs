@@ -145,6 +145,13 @@ async fn test_handle_privmsg_command() {
     assert!(result.is_ok());
     let messages = result.unwrap();
     assert_eq!(messages, vec![":user1 PRIVMSG #testchannel :Hello, channel!"]);
+
+    // Test self-message (should be empty)
+    let command = Command::PrivMsg("user1".to_string(), "Hello, myself!".to_string());
+    let result = handle_command(command, 1, &shared_state).await;
+    assert!(result.is_ok());
+    let messages = result.unwrap();
+    assert_eq!(messages, vec![]);
 }
 
 #[tokio::test]
