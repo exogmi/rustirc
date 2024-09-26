@@ -151,11 +151,7 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
         let target_user = users.values().find(|u| u.nickname.as_ref() == Some(&target))
             .ok_or_else(|| format!("User {} not found", target))?;
         
-        if target_user.id != client_id {
-            Ok(vec![(target_user.id, format!(":{} PRIVMSG {} :{}", sender_nick, target, message))])
-        } else {
-            Ok(vec![])
-        }
+        Ok(vec![(target_user.id, format!(":{} PRIVMSG {} :{}", sender_nick, target, message))])
     }
 }
 
