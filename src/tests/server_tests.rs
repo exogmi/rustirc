@@ -61,3 +61,44 @@ async fn test_multiple_client_connections() {
 
     server_task.abort();
 }
+
+#[tokio::test]
+async fn test_two_clients_join_and_message() {
+    use tokio::io::{AsyncWriteExt, AsyncReadExt};
+
+    let server_address = "127.0.0.1:8082";
+    let server_task = tokio::spawn(async move {
+        if let Err(e) = start_server(server_address, log::LevelFilter::Info).await {
+            eprintln!("Server error: {}", e);
+        }
+    });
+
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
+    async fn connect_and_register(address: &str, nickname: &str) -> TcpStream {
+        let mut stream = TcpStream::connect(address).await.unwrap();
+        stream.write_all(format!("NICK {}\r\n", nickname).as_bytes()).await.unwrap();
+        stream.write_all(format!("USER {} 0 * :{}\r\n", nickname, nickname).as_bytes()).await.unwrap();
+        stream
+    }
+
+    let mut client1 = connect_and_register(server_address, "user1").await;
+    let mut client2 = connect_and_register(server_address, "user2").await;
+
+    // Join channel
+    for client in [&mut client1, &mut client2].iter_mut() {
+        client.write_all(b"JOIN #test\r\n").await.unwrap();
+    }
+
+    // Send message from client1
+    client1.write_all(b"PRIVMSG #test :Hello, channel!\r\n").await.unwrap();
+
+    // Read response on client2
+    let mut buffer = [0; 1024];
+    let n = client2.read(&mut buffer).await.unwrap();
+    let response = String::from_utf8_lossy(&buffer[..n]);
+
+    assert!(response.contains("PRIVMSG #test :Hello, channel!"), "Unexpected response: {}", response);
+
+    server_task.abort();
+}
