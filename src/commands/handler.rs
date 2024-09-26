@@ -159,7 +159,7 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
     }
 }
 
-fn handle_quit(client_id: usize, message: Option<String>, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_quit(client_id: usize, message: Option<String>, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     let mut users = shared_state.users.lock().unwrap();
     let mut channels = shared_state.channels.lock().unwrap();
 
@@ -167,13 +167,21 @@ fn handle_quit(client_id: usize, message: Option<String>, shared_state: &SharedS
         let nick = user.nickname.unwrap_or_else(|| client_id.to_string());
         let quit_message = message.unwrap_or_else(|| "Client Quit".to_string());
 
+        let mut responses = Vec::new();
+
         for channel_name in &user.channels {
             if let Some(channel) = channels.get_mut(channel_name) {
                 channel.remove_member(&client_id);
+                for &member_id in &channel.members {
+                    responses.push((member_id, format!(":{} QUIT :{}", nick, quit_message)));
+                }
             }
         }
 
-        Ok(vec![format!(":{} QUIT :{}", nick, quit_message)])
+        // Add a response for the client who is quitting
+        responses.push((client_id, format!(":{} QUIT :{}", nick, quit_message)));
+
+        Ok(responses)
     } else {
         Err("User not found".to_string())
     }
