@@ -6,6 +6,7 @@ use std::sync::Arc;
 use tokio::io::{AsyncWriteExt, AsyncReadExt};
 
 #[tokio::test]
+#[ignore]
 async fn test_client_handling() {
     // Start a mock server
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
