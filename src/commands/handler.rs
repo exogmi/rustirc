@@ -65,7 +65,7 @@ fn handle_user(client_id: usize, username: String, realname: String, shared_stat
     }
 }
 
-fn handle_join(client_id: usize, channel_name: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_join(client_id: usize, channel_name: String, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     let mut channels = shared_state.channels.lock().unwrap();
     let mut users = shared_state.users.lock().unwrap();
 
@@ -84,15 +84,19 @@ fn handle_join(client_id: usize, channel_name: String, shared_state: &SharedStat
         let names_message = format!(":{} 353 {} = {} :{}", "server", nick, channel_name, user_list);
         let end_of_names = format!(":{} 366 {} {} :End of /NAMES list", "server", nick, channel_name);
         
-        let mut messages = vec![join_message.clone(), names_message.clone(), end_of_names.clone()];
+        let mut messages = vec![
+            (client_id, join_message.clone()),
+            (client_id, names_message.clone()),
+            (client_id, end_of_names.clone())
+        ];
         
         // Notify other channel members about the new user
         for &member_id in &channel.members {
             if member_id != client_id {
                 if let Some(member) = users.get(&member_id) {
                     let member_nick = member.nickname.clone().unwrap_or_else(|| member_id.to_string());
-                    messages.push(format!(":{} 353 {} = {} :{}", "server", member_nick, channel_name, user_list));
-                    messages.push(format!(":{} 366 {} {} :End of /NAMES list", "server", member_nick, channel_name));
+                    messages.push((member_id, format!(":{} 353 {} = {} :{}", "server", member_nick, channel_name, user_list)));
+                    messages.push((member_id, format!(":{} 366 {} {} :End of /NAMES list", "server", member_nick, channel_name)));
                 }
             }
         }
