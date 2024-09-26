@@ -46,19 +46,19 @@ fn handle_nick(client_id: usize, nickname: String, shared_state: &SharedState) -
     Ok(vec![(client_id, format!(":{} NICK :{}", old_nick, nickname))])
 }
 
-fn handle_user(client_id: usize, username: String, realname: String, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_user(client_id: usize, username: String, realname: String, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     let mut users = shared_state.users.lock().unwrap();
     if let Some(user) = users.get_mut(&client_id) {
         user.username = Some(username);
         user.realname = Some(realname);
         let nickname = user.nickname.clone().unwrap_or_else(|| format!("User{}", client_id));
         Ok(vec![
-            format!(":{} 001 {} :Welcome to the IRC server!", "server", nickname),
-            format!(":{} 002 {} :Your host is rustirc2, running version 1.0", "server", nickname),
-            format!(":{} 003 {} :This server was created {}", "server", nickname, chrono::Utc::now().format("%Y-%m-%d")),
-            format!(":{} 004 {} rustirc2 1.0 o o", "server", nickname),
-            format!(":{} 005 {} CHANTYPES=# CHARSET=utf-8 :are supported by this server", "server", nickname),
-            format!(":{} 251 {} :There are {} users and 0 services on 1 server", "server", nickname, users.len()),
+            (client_id, format!(":{} 001 {} :Welcome to the IRC server!", "server", nickname)),
+            (client_id, format!(":{} 002 {} :Your host is rustirc2, running version 1.0", "server", nickname)),
+            (client_id, format!(":{} 003 {} :This server was created {}", "server", nickname, chrono::Utc::now().format("%Y-%m-%d"))),
+            (client_id, format!(":{} 004 {} rustirc2 1.0 o o", "server", nickname)),
+            (client_id, format!(":{} 005 {} CHANTYPES=# CHARSET=utf-8 :are supported by this server", "server", nickname)),
+            (client_id, format!(":{} 251 {} :There are {} users and 0 services on 1 server", "server", nickname, users.len())),
         ])
     } else {
         Err("User not found".to_string())
