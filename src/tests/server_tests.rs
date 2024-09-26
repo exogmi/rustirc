@@ -2,6 +2,7 @@ use tokio::net::TcpStream;
 use crate::server::listener::start_server;
 use std::time::Duration;
 use tokio::time::timeout;
+use tokio::io::{AsyncWriteExt, AsyncReadExt};
 
 #[tokio::test]
 async fn test_server_starts_and_accepts_connections() {
@@ -65,12 +66,6 @@ async fn test_multiple_client_connections() {
 
 #[tokio::test]
 async fn test_two_clients_join_and_message() {
-    use tokio::io::{AsyncWriteExt, AsyncReadExt};
-    use tokio::time::timeout;
-    use std::time::Duration;
-    use tokio::time::timeout;
-    use std::time::Duration;
-
     let server_address = "127.0.0.1:8082";
     let server_task = tokio::spawn(async move {
         if let Err(e) = start_server(server_address, log::LevelFilter::Debug).await {
