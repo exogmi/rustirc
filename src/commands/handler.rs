@@ -35,6 +35,7 @@ pub async fn handle_command(command: Command, client_id: usize, shared_state: &S
         Command::WhoisChannels(_) => Err("WHOIS command not implemented yet".to_string()),
         Command::WhoisAuth(_) => Err("WHOIS command not implemented yet".to_string()),
         Command::Whowas(_, _, _) => Err("WHOWAS command not implemented yet".to_string()),
+        Command::Cap(subcommand, param) => handle_cap(client_id, subcommand, param, shared_state),
     }
 }
 
@@ -54,7 +55,15 @@ fn handle_user(client_id: usize, username: String, realname: String, shared_stat
     if let Some(user) = users.get_mut(&client_id) {
         user.username = Some(username);
         user.realname = Some(realname);
-        Ok(vec!["Welcome to the IRC server!".to_string()])
+        let nickname = user.nickname.clone().unwrap_or_else(|| format!("User{}", client_id));
+        Ok(vec![
+            format!("001 {} :Welcome to the IRC server!", nickname),
+            format!("002 {} :Your host is rustirc2, running version 1.0", nickname),
+            format!("003 {} :This server was created {}", nickname, chrono::Utc::now().format("%Y-%m-%d")),
+            format!("004 {} rustirc2 1.0 o o", nickname),
+            format!("005 {} CHANTYPES=# CHARSET=utf-8 :are supported by this server", nickname),
+            format!("251 {} :There are {} users and 0 services on 1 server", nickname, users.len()),
+        ])
     } else {
         Err("User not found".to_string())
     }
@@ -245,4 +254,12 @@ fn handle_list(channel: Option<String>, shared_state: &SharedState) -> Result<Ve
 
     response.push(format!(":{} 323 :End of /LIST", "server"));
     Ok(response)
+}
+fn handle_cap(client_id: usize, subcommand: String, param: Option<String>, shared_state: &SharedState) -> Result<Vec<String>, String> {
+    match subcommand.as_str() {
+        "LS" => Ok(vec!["CAP * LS :".to_string()]),
+        "REQ" => Ok(vec!["CAP * ACK :".to_string()]),
+        "END" => Ok(vec![]),
+        _ => Err(format!("Unknown CAP subcommand: {}", subcommand)),
+    }
 }

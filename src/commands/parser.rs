@@ -25,6 +25,7 @@ pub enum Command {
     WhoisChannels(String),
     WhoisAuth(String),
     Whowas(String, Option<String>, Option<String>),
+    Cap(String, Option<String>),
 }
 
 pub fn parse_command(input: &str) -> Option<Command> {
@@ -91,6 +92,13 @@ pub fn parse_command(input: &str) -> Option<Command> {
                 whowas_parts.next()?.to_string(),
                 whowas_parts.next().map(|s| s.to_string()),
                 whowas_parts.next().map(|s| s.to_string()),
+            ))
+        }
+        "CAP" => {
+            let mut cap_parts = params.splitn(2, ' ');
+            Some(Command::Cap(
+                cap_parts.next()?.to_string(),
+                cap_parts.next().map(|s| s.to_string()),
             ))
         }
         _ => None,
