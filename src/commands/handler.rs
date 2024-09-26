@@ -57,12 +57,12 @@ fn handle_user(client_id: usize, username: String, realname: String, shared_stat
         user.realname = Some(realname);
         let nickname = user.nickname.clone().unwrap_or_else(|| format!("User{}", client_id));
         Ok(vec![
-            format!("001 {} :Welcome to the IRC server!", nickname),
-            format!("002 {} :Your host is rustirc2, running version 1.0", nickname),
-            format!("003 {} :This server was created {}", nickname, chrono::Utc::now().format("%Y-%m-%d")),
-            format!("004 {} rustirc2 1.0 o o", nickname),
-            format!("005 {} CHANTYPES=# CHARSET=utf-8 :are supported by this server", nickname),
-            format!("251 {} :There are {} users and 0 services on 1 server", nickname, users.len()),
+            format!(":{} 001 {} :Welcome to the IRC server!", "server", nickname),
+            format!(":{} 002 {} :Your host is rustirc2, running version 1.0", "server", nickname),
+            format!(":{} 003 {} :This server was created {}", "server", nickname, chrono::Utc::now().format("%Y-%m-%d")),
+            format!(":{} 004 {} rustirc2 1.0 o o", "server", nickname),
+            format!(":{} 005 {} CHANTYPES=# CHARSET=utf-8 :are supported by this server", "server", nickname),
+            format!(":{} 251 {} :There are {} users and 0 services on 1 server", "server", nickname, users.len()),
         ])
     } else {
         Err("User not found".to_string())
@@ -134,7 +134,10 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
     if let Some(sender) = users.get(&client_id) {
         let sender_nick = sender.nickname.clone().unwrap_or_else(|| client_id.to_string());
         let recipient = if target.starts_with('#') {
-            if let Some(_) = channels.get(&target) {
+            if let Some(channel) = channels.get(&target) {
+                if !channel.members.contains(&client_id) {
+                    return Err(format!("You're not on that channel"));
+                }
                 Recipient::Channel(target.clone())
             } else {
                 return Err(format!("Channel {} not found", target));
@@ -147,16 +150,12 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
             }
         };
 
-        let msg = Message::new(client_id, recipient.clone(), message.clone());
-
         match recipient {
             Recipient::Channel(channel_name) => {
                 if let Some(channel) = channels.get(&channel_name) {
                     let mut messages = Vec::new();
                     for &member_id in &channel.members {
-                        if member_id != client_id {
-                            messages.push(format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message));
-                        }
+                        messages.push(format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message));
                     }
                     Ok(messages)
                 } else {

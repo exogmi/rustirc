@@ -30,7 +30,9 @@ async fn test_handle_nick_command() {
 #[tokio::test]
 async fn test_handle_user_command() {
     let mut users = HashMap::new();
-    users.insert(1, User::new(1, "127.0.0.1".parse().unwrap()));
+    let mut user = User::new(1, "127.0.0.1".parse().unwrap());
+    user.set_nickname("User1".to_string()).unwrap();
+    users.insert(1, user);
     let shared_state = SharedState {
         users: Arc::new(Mutex::new(users)),
         channels: Arc::new(Mutex::new(HashMap::new())),
@@ -40,7 +42,13 @@ async fn test_handle_user_command() {
     let result = handle_command(command, 1, &shared_state).await;
     assert!(result.is_ok());
     let messages = result.unwrap();
-    assert_eq!(messages, vec!["Welcome to the IRC server!"]);
+    assert_eq!(messages.len(), 6);
+    assert!(messages[0].contains("001 User1 :Welcome to the IRC server!"));
+    assert!(messages[1].contains("002 User1 :Your host is rustirc2"));
+    assert!(messages[2].contains("003 User1 :This server was created"));
+    assert!(messages[3].contains("004 User1 rustirc2 1.0 o o"));
+    assert!(messages[4].contains("005 User1 CHANTYPES=# CHARSET=utf-8"));
+    assert!(messages[5].contains("251 User1 :There are 1 users and 0 services on 1 server"));
 
     let users = shared_state.users.lock().unwrap();
     let user = users.get(&1).unwrap();
