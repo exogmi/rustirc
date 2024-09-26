@@ -125,10 +125,7 @@ fn handle_privmsg(client_id: usize, target: String, message: String, shared_stat
         match recipient {
             Recipient::Channel(channel_name) => {
                 if let Some(channel) = channels.get(&channel_name) {
-                    Ok(channel.members.iter()
-                        .filter(|&&id| id != client_id)
-                        .map(|&_id| format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message))
-                        .collect())
+                    Ok(vec![format!(":{} PRIVMSG {} :{}", sender_nick, channel_name, message)])
                 } else {
                     Err(format!("Channel {} not found", channel_name))
                 }
