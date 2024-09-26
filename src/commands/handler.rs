@@ -18,7 +18,7 @@ pub async fn handle_command(command: Command, client_id: usize, shared_state: &S
         Command::Part(channel) => handle_part(client_id, channel, shared_state),
         Command::PrivMsg(target, message) => handle_privmsg(client_id, target, message, shared_state),
         Command::Quit(message) => handle_quit(client_id, message, shared_state),
-        Command::Ping(server) => handle_ping(server),
+        Command::Ping(server) => handle_ping(client_id, server),
         Command::Pong(_) => handle_pong(client_id, shared_state),
         Command::Mode(_, _, _) => Err("MODE command not implemented yet".to_string()),
         Command::Topic(channel, topic) => handle_topic(client_id, channel, topic, shared_state),
@@ -187,8 +187,8 @@ fn handle_quit(client_id: usize, message: Option<String>, shared_state: &SharedS
     }
 }
 
-fn handle_ping(server: String) -> Result<Vec<String>, String> {
-    Ok(vec![format!("PONG {}", server)])
+fn handle_ping(client_id: usize, server: String) -> Result<Vec<(usize, String)>, String> {
+    Ok(vec![(client_id, format!("PONG {}", server))])
 }
 
 fn handle_pong(client_id: usize, shared_state: &SharedState) -> Result<Vec<String>, String> {
