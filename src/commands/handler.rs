@@ -191,12 +191,12 @@ fn handle_ping(client_id: usize, server: String) -> Result<Vec<(usize, String)>,
     Ok(vec![(client_id, format!("PONG {}", server))])
 }
 
-fn handle_pong(client_id: usize, shared_state: &SharedState) -> Result<Vec<String>, String> {
+fn handle_pong(client_id: usize, shared_state: &SharedState) -> Result<Vec<(usize, String)>, String> {
     let mut users = shared_state.users.lock().unwrap();
     if let Some(_user) = users.get_mut(&client_id) {
         // Update last activity timestamp
         // For now, we'll just return an OK message
-        Ok(vec!["PONG received".to_string()])
+        Ok(vec![(client_id, "PONG received".to_string())])
     } else {
         Err("User not found".to_string())
     }
