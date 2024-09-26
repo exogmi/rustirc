@@ -27,7 +27,7 @@ impl SharedState {
     }
 }
 
-pub async fn start_server(address: &str, log_level: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn start_server(address: &str, _log_level: LevelFilter) -> Result<(), Box<dyn std::error::Error>> {
     let listener = TcpListener::bind(address).await?;
     log::info!("Server listening on {}", address);
 
