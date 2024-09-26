@@ -108,7 +108,10 @@ async fn test_two_clients_join_and_message() {
         let mut response = String::new();
         loop {
             match client2.read(&mut buffer).await {
-                Ok(0) => break,
+                Ok(0) => {
+                    println!("Client2 connection closed");
+                    break;
+                },
                 Ok(n) => {
                     let chunk = String::from_utf8_lossy(&buffer[..n]);
                     println!("Received chunk: {}", chunk);
@@ -136,5 +139,8 @@ async fn test_two_clients_join_and_message() {
         }
     }
 
+    // Clean up
+    drop(client1);
+    drop(client2);
     server_task.abort();
 }

@@ -1,6 +1,7 @@
 
 use tokio::net::TcpStream;
 use tokio::io::{AsyncWriteExt, BufReader, AsyncBufReadExt};
+use tokio::sync::broadcast;
 use crate::commands::parser::parse_command;
 use crate::commands::handler::{handle_command, SharedState as HandlerSharedState};
 use crate::models::user::User;
@@ -12,14 +13,18 @@ pub struct Client {
     pub id: usize,
     pub stream: TcpStream,
     pub user: User,
+    pub tx: broadcast::Sender<String>,
+    pub rx: broadcast::Receiver<String>,
 }
 
 impl Client {
-    pub fn new(id: usize, stream: TcpStream, ip: std::net::IpAddr) -> Self {
+    pub fn new(id: usize, stream: TcpStream, ip: std::net::IpAddr, tx: broadcast::Sender<String>) -> Self {
         Client {
             id,
             stream,
             user: User::new(id, ip),
+            tx: tx.clone(),
+            rx: tx.subscribe(),
         }
     }
 
@@ -32,23 +37,43 @@ impl Client {
             channels: Arc::clone(&shared_state.channels),
         };
 
-        while let Some(line) = reader.next_line().await? {
-            if log_level == LevelFilter::Trace {
-                log::trace!("Received from client {}: {}", self.id, line);
-            }
+        loop {
+            tokio::select! {
+                result = reader.next_line() => {
+                    match result {
+                        Ok(Some(line)) => {
+                            if log_level == LevelFilter::Trace {
+                                log::trace!("Received from client {}: {}", self.id, line);
+                            }
 
-            if let Some(command) = parse_command(&line) {
-                if log_level >= LevelFilter::Debug {
-                    log::debug!("Parsed command from client {}: {:?}", self.id, command);
+                            if let Some(command) = parse_command(&line) {
+                                if log_level >= LevelFilter::Debug {
+                                    log::debug!("Parsed command from client {}: {:?}", self.id, command);
+                                }
+
+                                let responses = handle_command(command, self.id, &handler_shared_state).await?;
+                                for response in responses {
+                                    self.tx.send(response.clone())?;
+                                    writer.write_all(response.as_bytes()).await?;
+                                    writer.write_all(b"\r\n").await?;
+
+                                    if log_level == LevelFilter::Trace {
+                                        log::trace!("Sent to client {}: {}", self.id, response);
+                                    }
+                                }
+                            }
+                        }
+                        Ok(None) => break,
+                        Err(e) => return Err(Box::new(e)),
+                    }
                 }
-
-                let responses = handle_command(command, self.id, &handler_shared_state).await?;
-                for response in responses {
-                    writer.write_all(response.as_bytes()).await?;
-                    writer.write_all(b"\r\n").await?;
-
-                    if log_level == LevelFilter::Trace {
-                        log::trace!("Sent to client {}: {}", self.id, response);
+                result = self.rx.recv() => {
+                    match result {
+                        Ok(msg) => {
+                            writer.write_all(msg.as_bytes()).await?;
+                            writer.write_all(b"\r\n").await?;
+                        }
+                        Err(e) => log::error!("Error receiving broadcast: {}", e),
                     }
                 }
             }
