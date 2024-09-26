@@ -40,9 +40,17 @@ impl Client {
                 match handle_command(command, self.id, &handler_shared_state).await {
                     Ok(responses) => {
                         for response in responses {
-                            if let Err(e) = self.send_message(&response).await {
+                            if let Err(e) = writer.write_all(response.as_bytes()).await {
                                 log::error!("Error sending message to client {}: {}", self.id, e);
-                                return Err(e);
+                                return Err(Box::new(e));
+                            }
+                            if let Err(e) = writer.write_all(b"\r\n").await {
+                                log::error!("Error sending message to client {}: {}", self.id, e);
+                                return Err(Box::new(e));
+                            }
+                            if let Err(e) = writer.flush().await {
+                                log::error!("Error flushing message to client {}: {}", self.id, e);
+                                return Err(Box::new(e));
                             }
                         }
                     }
@@ -68,11 +76,4 @@ impl Client {
         Ok(())
     }
 
-    async fn send_message(&mut self, message: &str) -> Result<(), Box<dyn std::error::Error>> {
-        self.stream.write_all(message.as_bytes()).await?;
-        self.stream.write_all(b"\r\n").await?;
-        self.stream.flush().await?;
-        log::trace!("Sent to client {}: {}", self.id, message);
-        Ok(())
-    }
 }
