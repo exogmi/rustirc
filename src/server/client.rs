@@ -6,7 +6,6 @@ use crate::commands::handler::{handle_command, SharedState as HandlerSharedState
 use crate::models::user::User;
 use std::sync::Arc;
 use crate::server::listener::SharedState as ListenerSharedState;
-use log::LevelFilter;
 
 pub struct Client {
     pub id: usize,

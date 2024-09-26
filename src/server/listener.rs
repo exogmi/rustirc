@@ -38,7 +38,7 @@ pub async fn start_server(address: &str, log_level: LevelFilter) -> Result<(), B
         let state = Arc::clone(&shared_state);
 
         tokio::spawn(async move {
-            if let Err(e) = handle_client(socket, state, addr, log_level).await {
+            if let Err(e) = handle_client(socket, state, addr).await {
                 log::error!("Error handling client {}: {}", addr, e);
             }
         });
